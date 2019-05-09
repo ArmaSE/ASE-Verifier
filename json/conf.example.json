@@ -1,0 +1,14 @@
+{
+    "botName": "will be filled on first bot start",
+    "botID": "will be filled on first bot start",
+    "botToken": "Bot secret goes here",
+    "botVersion": "0.0.2-a",
+
+    "indev": false,
+    "prefix": "§§",
+    "enableResponses": false,
+    "activity": "Sets activity (Now Playing) of the bot",
+    
+    "verifyGuildID": "ID of the guild where verification should occur",
+    "verifyRoleID": "ID of the role that should be given upon verification"
+}
