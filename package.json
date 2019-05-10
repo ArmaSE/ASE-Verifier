@@ -24,6 +24,7 @@
   "homepage": "https://github.com/obliv1on/ase-verifier#readme",
   "dependencies": {
     "discord.js": "^11.0.0",
-    "express": "^4.16.4"
+    "express": "^4.16.4",
+    "hat": "0.0.3"
   }
 }

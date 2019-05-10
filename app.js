@@ -1,12 +1,17 @@
+const startTime = new Date().getTime();
+
 const Discord = require('discord.js');
 const Express = require('express');
 const fs = require('fs');
 const conf = require('./json/conf.json');
+global.conf = conf;
 
 var initialized = false;
 const bot = new Discord.Client();
 const app = Express();
+const expressPort = 8081;
 
+// On successful connection to Discord
 bot.on("ready", () => {
     init();
 });
@@ -14,25 +19,33 @@ bot.on("ready", () => {
 // Initialize the bot.
 function init() {
     if (initialized) return;
+
     conf.botName = bot.user.username;
     conf.botID = bot.user.id;
     bot.user.setActivity(conf.activity, {type: "PLAYING"});
-    console.log(`
-    ====
-    Successfully connected to Discord!
-    >Name of bot: ${bot.user.username}
-    >Bot ID: ${conf.botID}
-    >Prefix: ${conf.prefix}
-    >Enable guild command cogs: ${conf.enableResponses}
-    ====
-    Trying to start Express:`);
+
+    console.log(`== Discord ==\n`+
+    `> Successfully connected to Discord (${new Date().getTime() - startTime} ms)!\n`+
+    `> Name of bot: ${bot.user.username}\n`+
+    `> Current activity: ${conf.activity}\n`+
+    `> Bot ID: ${conf.botID}\n`+
+    `> Prefix: ${conf.prefix}\n`+
+    `> Enable guild command cogs: ${conf.enableResponses}\n`+
+    `> Developer mode: ${conf.indev}\n`+
+    `== EndInit ==`);
+
     initialized = true;
     fs.writeFile('.//json/conf.json', JSON.stringify(conf, null, 4), (err) => { if (err) console.error(err) });
 }
 
+// 
+// Discord stuff
+// 
+
 // Funtion to read in the dynamic cogs ('modules' folder), except for modules in "modules/express"
+// Made to be able to update the modules without restarting the bot.
 fs.readdir("./modules/", (err, files) => {
-    if (conf.enableResponses == false) return; // Return no answer if this variable is set to false in the config
+    if (conf.enableResponses == false) return; // Ignore rest if this variable is set to false in the config
 
     if (err) return console.error(err);
     files.forEach(file => {
@@ -79,8 +92,87 @@ bot.on("message", msg => {
         }});
     }
 });
+
+// On joining new Discord server
 bot.on("guildCreate", guild => {
-    console.log(`Guild joined: ${guild.name}`)
+    console.log(`Guild joined: ${guild.name}`);
 });
 
+// Connect to Discord
 bot.login(conf.botToken);
+
+// 
+// Express stuff
+// 
+
+// Same as module reading for Discord, but only for express modules.
+// Made to be able to update the modules without restarting the bot.
+fs.readdir("./modules/express/", (err, files) => {
+    console.log(`> Loading Express modules`);
+    let responseTime = new Date().getTime();
+    if (err) return console.log(err);
+    files.forEach(file => {
+        let evtFunction = require(`./modules/express/${file}`);
+        let evtName = file.split(".")[0];
+        bot.on(evtName, (...args) => evtFunction.run(bot, ...args));
+    });
+    responseTime = new Date().getTime() - responseTime;
+    console.log(`> Finished loading Express modules (${responseTime} ms)`);
+});
+
+app.listen(expressPort, () => {
+    console.log(`== Express ==\n> Listening on port: ${expressPort}`)
+});
+
+app.get('/verify/:userId(\\d+)/secret/:secretId', function (request, response) {
+    let expressArgs = request.params;
+    expressArgs.guildID = conf.verifyGuildID;
+    expressArgs.roleID = conf.verifyRoleID;
+    let expressModule = require(`./modules/express/get.js`);
+    let keys = require('./json/keys.json').list;
+
+    // Check if transmitted secret is valid
+    for (var i = 0; i < keys.length; i++) {
+        if (keys[i] !== expressArgs.secretId) {
+            response.json({"401": "Key is not accepted"});
+            return;
+        }
+    }
+
+    console.log(`\n> Verification request from: ${expressArgs.secretId}`);
+
+    // Gets the guild by using the ID specified in the config
+    let guild = bot.guilds.find(guild => guild.id, conf.verifyGuildID);
+    // let guildRoles = bot.guilds.find(guild => guild.id, conf.verifyGuildId).roles.find(roles => roles.id, conf.verifyRoleId);
+    // console.log(guildRoles);
+
+    if (!guild.me.hasPermission("MANAGE_ROLES")) {
+        console.log(`\n> Bot instance lacks permission: MANAGE_ROLES`);
+        return response.json({"401": "Bot lacks permission"});
+    } else {
+        try {
+            guild.members.find(user => user.id, expressArgs.userId).addRole(expressArgs.roleID)
+        } catch (e) {
+            console.log(e);
+            return response.json({"401": "Bot lacks permission"});
+        }
+        
+        console.log(expressArgs);
+        expressArgs.secretId = undefined;
+        response.send(expressArgs);
+        return;
+    }
+});
+
+app.get('/secret/generate/', function (request, response) {
+    let hat = require('hat');
+    let id = hat();
+
+    let keysFile = require('./json/keys.json');
+    keysFile.list.push(id);
+    fs.writeFile('.//json/keys.json', JSON.stringify(keysFile, null, 4), (err) => { if (err) console.error(err) });
+
+    console.log(`\n> Generated new secret: ${id}`);
+    console.log({"secretId": id});
+    response.json({"secretId": id});
+});

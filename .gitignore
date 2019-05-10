@@ -49,5 +49,7 @@ Temporary Items
 # Project-specific
 node_modules
 package-lock.json
-/json/conf.json
 core.js
+/json/conf.json
+/json/keys.json
+/json/keys_attr.json
