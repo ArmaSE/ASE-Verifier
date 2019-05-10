@@ -107,18 +107,18 @@ bot.login(conf.botToken);
 
 // Same as module reading for Discord, but only for express modules.
 // Made to be able to update the modules without restarting the bot.
-fs.readdir("./modules/express/", (err, files) => {
-    console.log(`> Loading Express modules`);
-    let responseTime = new Date().getTime();
-    if (err) return console.log(err);
-    files.forEach(file => {
-        let evtFunction = require(`./modules/express/${file}`);
-        let evtName = file.split(".")[0];
-        bot.on(evtName, (...args) => evtFunction.run(bot, ...args));
-    });
-    responseTime = new Date().getTime() - responseTime;
-    console.log(`> Finished loading Express modules (${responseTime} ms)`);
-});
+// fs.readdir("./modules/express/", (err, files) => {
+//     console.log(`> Loading Express modules`);
+//     let responseTime = new Date().getTime();
+//     if (err) return console.log(err);
+//     files.forEach(file => {
+//         let evtFunction = require(`./modules/express/${file}`);
+//         let evtName = file.split(".")[0];
+//         bot.on(evtName, (...args) => evtFunction.run(bot, ...args));
+//     });
+//     responseTime = new Date().getTime() - responseTime;
+//     console.log(`> Finished loading Express modules (${responseTime} ms)`);
+// });
 
 app.listen(expressPort, () => {
     console.log(`== Express ==\n> Listening on port: ${expressPort}`)
@@ -168,15 +168,19 @@ app.get('/api/verify/:userId(\\d+)/secret/:secretId', function (request, respons
     }
 });
 
-app.get('/api/secret/generate/', function (request, response) {
-    let hat = require('hat');
-    let id = hat();
+app.get('/api/secret/generate/:botSecret', function (request, response) {
+    if (request.params.botSecret !== conf.botToken) {
+        return response.json({"401": "bot secret mismatch"});
+    } else {
+        let hat = require('hat');
+        let id = hat();
 
-    let keysFile = require('./json/keys.json');
-    keysFile.list.push(id);
-    fs.writeFile('.//json/keys.json', JSON.stringify(keysFile, null, 4), (err) => { if (err) console.error(err) });
+        let keysFile = require('./json/keys.json');
+        keysFile.list.push(id);
+        fs.writeFile('.//json/keys.json', JSON.stringify(keysFile, null, 4), (err) => { if (err) console.error(err) });
 
-    console.log(`\n> Generated new secret: ${id}`);
-    console.log({"secretId": id});
-    response.json({"secretId": id});
+        console.log(`\n> Generated new secret: ${id}`);
+        console.log({"secretId": id});
+        response.json({"secretId": id});
+    }
 });
