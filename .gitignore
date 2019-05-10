@@ -50,6 +50,7 @@ Temporary Items
 node_modules
 package-lock.json
 core.js
+prepare-bot.js
 /json/conf.json
 /json/keys.json
-/json/keys_attr.json
+/json/keys-attr.json

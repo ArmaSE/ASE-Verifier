@@ -9,7 +9,7 @@ global.conf = conf;
 var initialized = false;
 const bot = new Discord.Client();
 const app = Express();
-const expressPort = 8081;
+const expressPort = conf.port;
 
 // On successful connection to Discord
 bot.on("ready", () => {
@@ -124,7 +124,7 @@ app.listen(expressPort, () => {
     console.log(`== Express ==\n> Listening on port: ${expressPort}`)
 });
 
-app.get('/verify/:userId(\\d+)/secret/:secretId', function (request, response) {
+app.get('/api/verify/:userId(\\d+)/secret/:secretId', function (request, response) {
     let expressArgs = request.params;
     expressArgs.guildID = conf.verifyGuildID;
     expressArgs.roleID = conf.verifyRoleID;
@@ -132,19 +132,23 @@ app.get('/verify/:userId(\\d+)/secret/:secretId', function (request, response) {
     let keys = require('./json/keys.json').list;
 
     // Check if transmitted secret is valid
+    accept = false;
+
     for (var i = 0; i < keys.length; i++) {
-        if (keys[i] !== expressArgs.secretId) {
-            response.json({"401": "Key is not accepted"});
-            return;
+        if (keys[i] == expressArgs.secretId) {
+            accept = true;
         }
+    }
+    console.log(accept);
+    if (!accept) {
+        response.json({"401": "Key is not accepted", "secret": expressArgs.secretId});
+        return;
     }
 
     console.log(`\n> Verification request from: ${expressArgs.secretId}`);
 
     // Gets the guild by using the ID specified in the config
     let guild = bot.guilds.find(guild => guild.id, conf.verifyGuildID);
-    // let guildRoles = bot.guilds.find(guild => guild.id, conf.verifyGuildId).roles.find(roles => roles.id, conf.verifyRoleId);
-    // console.log(guildRoles);
 
     if (!guild.me.hasPermission("MANAGE_ROLES")) {
         console.log(`\n> Bot instance lacks permission: MANAGE_ROLES`);
@@ -154,7 +158,7 @@ app.get('/verify/:userId(\\d+)/secret/:secretId', function (request, response) {
             guild.members.find(user => user.id, expressArgs.userId).addRole(expressArgs.roleID)
         } catch (e) {
             console.log(e);
-            return response.json({"401": "Bot lacks permission"});
+            return response.json({"401": "The user may be above the role hierarchy"});
         }
         
         console.log(expressArgs);
@@ -164,7 +168,7 @@ app.get('/verify/:userId(\\d+)/secret/:secretId', function (request, response) {
     }
 });
 
-app.get('/secret/generate/', function (request, response) {
+app.get('/api/secret/generate/', function (request, response) {
     let hat = require('hat');
     let id = hat();
 
