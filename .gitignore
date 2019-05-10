@@ -54,3 +54,4 @@ prepare-bot.js
 /json/conf.json
 /json/keys.json
 /json/keys-attr.json
+/logs/*

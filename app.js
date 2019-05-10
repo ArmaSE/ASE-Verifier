@@ -1,4 +1,5 @@
 const startTime = new Date().getTime();
+const auditFile = startTime;
 
 const Discord = require('discord.js');
 const Express = require('express');
@@ -33,7 +34,7 @@ function init() {
     `> Enable guild command cogs: ${conf.enableResponses}\n`+
     `> Developer mode: ${conf.indev}\n`+
     `== EndInit ==`);
-
+    appendAudit(auditFile, `== Discord ==\n> Successfully connected to Discord (${new Date().getTime() - startTime} ms)!\n> Name of bot: ${bot.user.username}\n> Current activity: ${conf.activity}\n> Bot ID: ${conf.botID}\n> Prefix: ${conf.prefix}\n> Enable guild command cogs: ${conf.enableResponses}\n> Developer mode: ${conf.indev}\n== EndInit ==`);
     initialized = true;
     fs.writeFile('.//json/conf.json', JSON.stringify(conf, null, 4), (err) => { if (err) console.error(err) });
 }
@@ -96,6 +97,7 @@ bot.on("message", msg => {
 // On joining new Discord server
 bot.on("guildCreate", guild => {
     console.log(`Guild joined: ${guild.name}`);
+    appendAudit(auditFile, `Guild joined: ${guild.name}`);
 });
 
 // Connect to Discord
@@ -121,7 +123,8 @@ bot.login(conf.botToken);
 // });
 
 app.listen(expressPort, () => {
-    console.log(`== Express ==\n> Listening on port: ${expressPort}`)
+    console.log(`== Express ==\n> Listening on port: ${expressPort}`);
+    appendAudit(auditFile, `== Express ==\n> Listening on port: ${expressPort}`);
 });
 
 app.get('/api/verify/:userId(\\d+)/secret/:secretId', function (request, response) {
@@ -139,29 +142,33 @@ app.get('/api/verify/:userId(\\d+)/secret/:secretId', function (request, respons
             accept = true;
         }
     }
-    console.log(accept);
+
     if (!accept) {
         response.json({"401": "Key is not accepted", "secret": expressArgs.secretId});
         return;
     }
 
     console.log(`\n> Verification request from: ${expressArgs.secretId}`);
+    appendAudit(auditFile, `\n> Verification request from: ${expressArgs.secretId}`);
 
     // Gets the guild by using the ID specified in the config
     let guild = bot.guilds.find(guild => guild.id, conf.verifyGuildID);
 
     if (!guild.me.hasPermission("MANAGE_ROLES")) {
         console.log(`\n> Bot instance lacks permission: MANAGE_ROLES`);
+        appendAudit(auditFile, `\n> Bot instance lacks permission: MANAGE_ROLES`);
         return response.json({"401": "Bot lacks permission"});
     } else {
         try {
             guild.members.find(user => user.id, expressArgs.userId).addRole(expressArgs.roleID)
         } catch (e) {
             console.log(e);
+            appendAudit(auditFile, "The user may be above the role hierarchy");
             return response.json({"401": "The user may be above the role hierarchy"});
         }
         
         console.log(expressArgs);
+        appendAudit(auditFile, expressArgs)
         expressArgs.secretId = undefined;
         response.send(expressArgs);
         return;
@@ -170,6 +177,7 @@ app.get('/api/verify/:userId(\\d+)/secret/:secretId', function (request, respons
 
 app.get('/api/secret/generate/:botSecret', function (request, response) {
     if (request.params.botSecret !== conf.botToken) {
+        appendAudit(auditFile, "bot secret mismatch");
         return response.json({"401": "bot secret mismatch"});
     } else {
         let hat = require('hat');
@@ -179,8 +187,23 @@ app.get('/api/secret/generate/:botSecret', function (request, response) {
         keysFile.list.push(id);
         fs.writeFile('.//json/keys.json', JSON.stringify(keysFile, null, 4), (err) => { if (err) console.error(err) });
 
+        appendappendAudit(auditFile, `\n> Generated new secret: ${id}`)
         console.log(`\n> Generated new secret: ${id}`);
-        console.log({"secretId": id});
         response.json({"secretId": id});
     }
 });
+
+app.get('/api/status', function (request, response) {
+    // TODO - write in-depth status response code
+    response.json({"status": 200});
+    console.log(`\nstatus requested, current status = 200`);
+    appendAudit(auditFile, `\nstatus requested, current status = 200`);
+});
+
+// 
+// Miscellaneous functions
+// 
+
+function appendAudit(file, line) {
+    fs.appendFile(`./logs/${file}.txt`, line, (err) => { if (err) console.error(err) })
+}
