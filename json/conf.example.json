@@ -2,7 +2,7 @@
     "botName": "will be filled on first bot start",
     "botID": "will be filled on first bot start",
     "botToken": "Bot secret goes here",
-    "botVersion": "0.0.2-a",
+    "botVersion": "0.0.2a",
 
     "indev": false,
     "prefix": "§§",
@@ -10,5 +10,6 @@
     "activity": "Sets activity (Now Playing) of the bot",
     
     "verifyGuildID": "ID of the guild where verification should occur",
-    "verifyRoleID": "ID of the role that should be given upon verification"
+    "verifyRoleID": "ID of the role that should be given upon verification",
+    "port": "8080"
 }
