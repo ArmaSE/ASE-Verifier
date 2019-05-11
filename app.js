@@ -25,16 +25,10 @@ function init() {
     conf.botID = bot.user.id;
     bot.user.setActivity(conf.activity, {type: "PLAYING"});
 
-    console.log(`== Discord ==\n`+
-    `> Successfully connected to Discord (${new Date().getTime() - startTime} ms)!\n`+
-    `> Name of bot: ${bot.user.username}\n`+
-    `> Current activity: ${conf.activity}\n`+
-    `> Bot ID: ${conf.botID}\n`+
-    `> Prefix: ${conf.prefix}\n`+
-    `> Enable guild command cogs: ${conf.enableResponses}\n`+
-    `> Developer mode: ${conf.indev}\n`+
-    `== EndInit ==`);
-    appendAudit(auditFile, `== Discord ==\n> Successfully connected to Discord (${new Date().getTime() - startTime} ms)!\n> Name of bot: ${bot.user.username}\n> Current activity: ${conf.activity}\n> Bot ID: ${conf.botID}\n> Prefix: ${conf.prefix}\n> Enable guild command cogs: ${conf.enableResponses}\n> Developer mode: ${conf.indev}\n== EndInit ==`);
+    let initLog = `== Discord ==\n> Successfully connected to Discord (${new Date().getTime() - startTime} ms)!\n> Name of bot: ${bot.user.username}\n> Current activity: ${conf.activity}\n> Bot ID: ${conf.botID}\n> Prefix: ${conf.prefix}\n> Enable guild command cogs: ${conf.enableResponses}\n> Enable reading Express modules: ${conf.readExpressModules}\n> Developer mode: ${conf.indev}\n== EndInit ==`;
+
+    console.log(initLog);
+    appendAudit(auditFile, initLog);
     initialized = true;
     fs.writeFile('.//json/conf.json', JSON.stringify(conf, null, 4), (err) => { if (err) console.error(err) });
 }
@@ -100,6 +94,15 @@ bot.on("guildCreate", guild => {
     appendAudit(auditFile, `Guild joined: ${guild.name}`);
 });
 
+bot.on("error", err => {
+    console.log(err);
+    appendAudit(auditFile, err);
+});
+
+bot.on("disconnect", () => {
+    bot.login(conf.botToken);
+})
+
 // Connect to Discord
 bot.login(conf.botToken);
 
@@ -109,18 +112,19 @@ bot.login(conf.botToken);
 
 // Same as module reading for Discord, but only for express modules.
 // Made to be able to update the modules without restarting the bot.
-// fs.readdir("./modules/express/", (err, files) => {
-//     console.log(`> Loading Express modules`);
-//     let responseTime = new Date().getTime();
-//     if (err) return console.log(err);
-//     files.forEach(file => {
-//         let evtFunction = require(`./modules/express/${file}`);
-//         let evtName = file.split(".")[0];
-//         bot.on(evtName, (...args) => evtFunction.run(bot, ...args));
-//     });
-//     responseTime = new Date().getTime() - responseTime;
-//     console.log(`> Finished loading Express modules (${responseTime} ms)`);
-// });
+fs.readdir("./modules/express/", (err, files) => {
+    if (!conf.readExpressModules) return;
+    console.log(`> Loading Express modules`);
+    let responseTime = new Date().getTime();
+    if (err) return console.log(err);
+    files.forEach(file => {
+        let evtFunction = require(`./modules/express/${file}`);
+        let evtName = file.split(".")[0];
+        bot.on(evtName, (...args) => evtFunction.run(bot, ...args));
+    });
+    responseTime = new Date().getTime() - responseTime;
+    console.log(`> Finished loading Express modules (${responseTime} ms)`);
+});
 
 app.listen(expressPort, () => {
     console.log(`== Express ==\n> Listening on port: ${expressPort}`);
