@@ -1,15 +1,18 @@
 const startTime = new Date().getTime();
 const auditFile = startTime;
 
+// Necessary files/libs
 const Discord = require('discord.js');
 const Express = require('express');
+const xml = require('xml2js');
 const fs = require('fs');
 const conf = require('./json/conf.json');
-global.conf = conf;
+const messageStore = require('./helpers/messageStore.js');
 
 var initialized = false;
 const bot = new Discord.Client();
 const app = Express();
+const builder = new xml.Builder();
 const expressPort = conf.port;
 
 let expressModules = {
@@ -17,6 +20,9 @@ let expressModules = {
     PUT: "./modules/express/put.js",
     POST: "./modules/express/post.js"
 }
+
+let messages = {};
+let messageIndex = [];
 
 // On successful connection to Discord
 bot.on("ready", () => {
@@ -29,7 +35,7 @@ function init() {
 
     conf.botName = bot.user.username;
     conf.botID = bot.user.id;
-    bot.user.setActivity(conf.activity, {type: "PLAYING"});
+    bot.user.setActivity(conf.activity, { type: "PLAYING" });
 
     let initLog = `== Discord ==\n> Successfully connected to Discord (${new Date().getTime() - startTime} ms)!\n> Name of bot: ${bot.user.username}\n> Current activity: ${conf.activity}\n> Bot ID: ${conf.botID}\n> Prefix: ${conf.prefix}\n> Enable guild command cogs: ${conf.enableResponses}\n> Enable reading Express modules: ${conf.readExpressModules}\n> Developer mode: ${conf.indev}\n== EndInit ==`;
     appendAudit(auditFile, initLog);
@@ -56,7 +62,8 @@ fs.readdir("./modules/", (err, files) => {
 
 // On new message seen by bot
 bot.on("message", msg => {
-    if (conf.enableResponses == false) return; // Return no answer if this variable is set to false in the config
+    // Stores message if the ID of the channel corresponds to the ID saved in conf.json
+    storeMessage(messageStore.convertMessage(msg));
 
     // Trim content, ignore if author is bot, and only continue if prefix is present
     const message = msg.content.trim();
@@ -68,27 +75,30 @@ bot.on("message", msg => {
     const command = message.split(/[ \n]/)[0].substring(conf.prefix.length).toLowerCase().trim();
 
     try {
-        // If command corresponds to cog with the same name, continue and pass message info and arguments to the cog
-        let cmdFile = require(`./modules/${command}.js`);
-        cmdFile.run(bot, msg, args, conf);
-
+        if (conf.enableResponses) {
+            // If command corresponds to cog with the same name, continue and pass message info and arguments to the cog
+            let cmdFile = require(`./modules/${command}.js`);
+            cmdFile.run(bot, msg, args, conf);
+        }
     } catch (e) {
         // Module not found, send error message in channel, and log the error in the console
         console.error(e);
-        msg.channel.sendMessage("", { embed: {
-            color: 16711680,
-            author: {
-                name: bot.user.username,
-                icon_url: bot.user.avatarURL,
-            },
-            title: `Error: Module not found`,
-            description: `Module ${command} does not exist. type **"${conf.prefix}list modules"** to see all available modules.`,
-            timestamp: new Date(),
-            footer: {
-                icon_url: msg.author.avatarURL,
-                text: `${msg.author.username}`
+        msg.channel.sendMessage("", {
+            embed: {
+                color: 16711680,
+                author: {
+                    name: bot.user.username,
+                    icon_url: bot.user.avatarURL,
+                },
+                title: `Error: Module not found`,
+                description: `Module ${command} does not exist. type **"${conf.prefix}list modules"** to see all available modules.`,
+                timestamp: new Date(),
+                footer: {
+                    icon_url: msg.author.avatarURL,
+                    text: `${msg.author.username}`
+                }
             }
-        }});
+        });
     }
 });
 
@@ -142,8 +152,8 @@ app.put('/api/verify/:userId(\\d+)/secret/:secretId', function (request, respons
     let cog = require(`./modules/express/put.js`);
     let roleHelper = require('./helpers/role-verification.js');
 
-    if(!cog.verifySecret(expressArgs.secretId)) {
-        respondJSON(response, {"401": "Secret is not accepted"});
+    if (!cog.verifySecret(expressArgs.secretId)) {
+        respondJSON(response, { "401": "Secret is not accepted" });
         return;
     }
 
@@ -153,16 +163,16 @@ app.put('/api/verify/:userId(\\d+)/secret/:secretId', function (request, respons
     let guild = bot.guilds.find(guild => guild.id, conf.verifyGuildID);
 
     if (!roleHelper.verifyRolePermission(guild, "MANAGE_ROLES")) {
-        return respondJSON(response, {"401": "Bot lacks permission (MANAGE_ROLES)"});
+        return respondJSON(response, { "401": "Bot lacks permission (MANAGE_ROLES)" });
     } else {
         try {
             guild.members.find(user => user.id, expressArgs.userId).addRole(expressArgs.roleID);
         } catch (e) {
-            return respondJSON(response, {"401": "The user may be above the role hierarchy"});
+            return respondJSON(response, { "401": "The user may be above the role hierarchy" });
         }
-        
+
         expressArgs.secretId = undefined;
-        sendRes = {"200": "User verified", "userID": expressArgs.userId, "roleID": expressArgs.roleID};
+        sendRes = { "200": "User verified", "userID": expressArgs.userId, "roleID": expressArgs.roleID };
         return respondJSON(response, sendRes);
     }
 });
@@ -170,27 +180,56 @@ app.put('/api/verify/:userId(\\d+)/secret/:secretId', function (request, respons
 app.post('/api/secret/generate/:botSecret', function (request, response) {
     if (request.params.botSecret !== conf.botToken) {
         appendAudit(auditFile, "bot secret mismatch");
-        return response.json({"401": "bot secret mismatch"});
+        return response.json({ "401": "bot secret mismatch" });
     } else {
         let hat = require('hat');
         let cog = require(expressModules.POST);
         let id = cog.generateSecret();
         appendAudit(auditFile, `\n> Generated new secret: ${id}`)
-        response.json({"secretId": id});
+        response.json({ "secretId": id });
     }
 });
 
+// Get status of the service
 app.get('/api/status', function (request, response) {
     let cog = require('./modules/express/get.js');
     let res = cog.getStatus(bot.status);
     respondJSON(response, res, true);
 });
 
+app.get('/api/guild/messages/:amount', function (request, response) {
+
+    let limit = request.params.amount;
+    if (limit > 100) {
+        limit = 100;
+    } else if (limit < 1) {
+        limit = 100;
+    }
+
+    preparedArray = messageIndex.slice(0, limit);
+    messageArray = {};
+    preparedArray.forEach((id) => {
+        messageArray[id] = messages[id];
+    })
+
+    response.type('application/xml');
+    // response.send(builder.buildObject(newObj));
+    response.send(builder.buildObject(messageArray));
+    console.log(messageArray);
+});
+
+app.get('/api/guild/members/', function (request, response) {
+    let guildMemberCount = bot.guilds.find(guild => guild.id, conf.verifyGuildID).memberCount;
+
+    response.json({members: guildMemberCount});
+});
+
+// Reload defined Express module
 app.get('/adm/reload/:type', function (request, response) {
     let type = request.params.type.toLowerCase();
     try {
         delete require.cache[require.resolve(`./modules/express/${type}.js`)];
-        response.json({200: `Successfully reloaded ${type} module!`});
+        response.json({ 200: `Successfully reloaded ${type} module!` });
     } catch (e) {
         //  On error
     }
@@ -200,7 +239,7 @@ app.get('/adm/reload/:type', function (request, response) {
 // Miscellaneous functions
 // 
 
-function appendAudit(file, line, stringify=false) {
+function appendAudit(file, line, stringify = false) {
     console.log(line);
     if (stringify) {
         line = JSON.stringify(line);
@@ -211,4 +250,19 @@ function appendAudit(file, line, stringify=false) {
 function respondJSON(response, content, stringify) {
     appendAudit(auditFile, content, stringify);
     response.json(content);
+}
+
+function storeMessage(message) {
+    if (conf.storeCount < (messageIndex.length)) {
+        messages[messageIndex[99]] = undefined;
+        messageIndex.pop();
+
+        messageIndex.unshift(`ID${message.content.id}`);
+        messages[`ID${message.content.id}`] = message;
+        console.log(`Message log capacity reached, removing oldest message`);
+    } else {
+        messageIndex.unshift(`ID${message.content.id}`);
+        messages[`ID${message.content.id}`] = message;
+        console.log(`Messages added to array, current message count: ${messageIndex.length}`);
+    }
 }
