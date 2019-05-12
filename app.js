@@ -12,6 +12,12 @@ const bot = new Discord.Client();
 const app = Express();
 const expressPort = conf.port;
 
+let expressModules = {
+    GET: "./modules/express/get.js",
+    PUT: "./modules/express/put.js",
+    POST: "./modules/express/post.js"
+}
+
 // On successful connection to Discord
 bot.on("ready", () => {
     init();
@@ -26,8 +32,6 @@ function init() {
     bot.user.setActivity(conf.activity, {type: "PLAYING"});
 
     let initLog = `== Discord ==\n> Successfully connected to Discord (${new Date().getTime() - startTime} ms)!\n> Name of bot: ${bot.user.username}\n> Current activity: ${conf.activity}\n> Bot ID: ${conf.botID}\n> Prefix: ${conf.prefix}\n> Enable guild command cogs: ${conf.enableResponses}\n> Enable reading Express modules: ${conf.readExpressModules}\n> Developer mode: ${conf.indev}\n== EndInit ==`;
-
-    console.log(initLog);
     appendAudit(auditFile, initLog);
     initialized = true;
     fs.writeFile('.//json/conf.json', JSON.stringify(conf, null, 4), (err) => { if (err) console.error(err) });
@@ -90,18 +94,16 @@ bot.on("message", msg => {
 
 // On joining new Discord server
 bot.on("guildCreate", guild => {
-    console.log(`Guild joined: ${guild.name}`);
     appendAudit(auditFile, `Guild joined: ${guild.name}`);
 });
 
 bot.on("error", err => {
-    console.log(`> An error has occured, please check log file "/logs/${auditFile}.txt" for more information.`);
     appendAudit(auditFile, err);
 
 });
 
 bot.on("disconnect", () => {
-    console.log(`> An error resulting in the Discord bot disconnecting has occured. Trying to connect again.`)
+    appendAudit(auditFile, `> An error resulting in the Discord bot disconnecting has occured. Trying to connect again.`)
     bot.login(conf.botToken);
 })
 
@@ -116,7 +118,7 @@ bot.login(conf.botToken);
 // Made to be able to update the modules without restarting the bot.
 fs.readdir("./modules/express/", (err, files) => {
     if (!conf.readExpressModules) return;
-    console.log(`> Loading Express modules`);
+    appendAudit(auditFile, `> Loading Express modules`);
     let responseTime = new Date().getTime();
     if (err) return console.log(err);
     files.forEach(file => {
@@ -125,91 +127,88 @@ fs.readdir("./modules/express/", (err, files) => {
         bot.on(evtName, (...args) => evtFunction.run(bot, ...args));
     });
     responseTime = new Date().getTime() - responseTime;
-    console.log(`> Finished loading Express modules (${responseTime} ms)`);
+    appendAudit(auditFile, `> Finished loading Express modules (${responseTime} ms)`);
 });
 
 app.listen(expressPort, () => {
-    console.log(`== Express ==\n> Listening on port: ${expressPort}`);
     appendAudit(auditFile, `== Express ==\n> Listening on port: ${expressPort}`);
 });
 
-app.get('/api/verify/:userId(\\d+)/secret/:secretId', function (request, response) {
+app.put('/api/verify/:userId(\\d+)/secret/:secretId', function (request, response) {
     let expressArgs = request.params;
     expressArgs.guildID = conf.verifyGuildID;
     expressArgs.roleID = conf.verifyRoleID;
-    let expressModule = require(`./modules/express/get.js`);
-    let keys = require('./json/keys.json').list;
 
-    // Check if transmitted secret is valid
-    accept = false;
+    let cog = require(`./modules/express/put.js`);
+    let roleHelper = require('./helpers/role-verification.js');
 
-    for (var i = 0; i < keys.length; i++) {
-        if (keys[i] == expressArgs.secretId) {
-            accept = true;
-        }
-    }
-
-    if (!accept) {
-        response.json({"401": "Secret is not accepted"});
+    if(!cog.verifySecret(expressArgs.secretId)) {
+        respondJSON(response, {"401": "Secret is not accepted"});
         return;
     }
 
-    console.log(`\n> Verification request from: ${expressArgs.secretId}`);
     appendAudit(auditFile, `\n> Verification request from: ${expressArgs.secretId}`);
 
     // Gets the guild by using the ID specified in the config
     let guild = bot.guilds.find(guild => guild.id, conf.verifyGuildID);
 
-    if (!guild.me.hasPermission("MANAGE_ROLES")) {
-        console.log(`\n> Bot instance lacks permission: MANAGE_ROLES`);
-        appendAudit(auditFile, `\n> Bot instance lacks permission: MANAGE_ROLES`);
-        return response.json({"401": "Bot lacks permission (MANAGE_ROLES)"});
+    if (!roleHelper.verifyRolePermission(guild, "MANAGE_ROLES")) {
+        return respondJSON(response, {"401": "Bot lacks permission (MANAGE_ROLES)"});
     } else {
         try {
-            guild.members.find(user => user.id, expressArgs.userId).addRole(expressArgs.roleID)
+            guild.members.find(user => user.id, expressArgs.userId).addRole(expressArgs.roleID);
         } catch (e) {
-            console.log(e);
-            appendAudit(auditFile, "The user may be above the role hierarchy");
-            return response.json({"401": "The user may be above the role hierarchy"});
+            return respondJSON(response, {"401": "The user may be above the role hierarchy"});
         }
         
-        console.log(expressArgs);
-        appendAudit(auditFile, expressArgs)
         expressArgs.secretId = undefined;
-        response.send(expressArgs);
-        return;
+        sendRes = {"200": "User verified", "userID": expressArgs.userId, "roleID": expressArgs.roleID};
+        return respondJSON(response, sendRes);
     }
 });
 
-app.get('/api/secret/generate/:botSecret', function (request, response) {
+app.post('/api/secret/generate/:botSecret', function (request, response) {
     if (request.params.botSecret !== conf.botToken) {
         appendAudit(auditFile, "bot secret mismatch");
         return response.json({"401": "bot secret mismatch"});
     } else {
         let hat = require('hat');
-        let id = hat();
-
-        let keysFile = require('./json/keys.json');
-        keysFile.list.push(id);
-        fs.writeFile('.//json/keys.json', JSON.stringify(keysFile, null, 4), (err) => { if (err) console.error(err) });
-
-        appendappendAudit(auditFile, `\n> Generated new secret: ${id}`)
-        console.log(`\n> Generated new secret: ${id}`);
+        let cog = require(expressModules.POST);
+        let id = cog.generateSecret();
+        appendAudit(auditFile, `\n> Generated new secret: ${id}`)
         response.json({"secretId": id});
     }
 });
 
 app.get('/api/status', function (request, response) {
-    // TODO - write in-depth status response code
-    response.json({"status": 200});
-    console.log(`\nStatus requested, current status = 200`);
-    appendAudit(auditFile, `\nStatus requested, current status = 200`);
+    let cog = require('./modules/express/get.js');
+    let res = cog.getStatus(bot.status);
+    respondJSON(response, res, true);
+});
+
+app.get('/adm/reload/:type', function (request, response) {
+    let type = request.params.type.toLowerCase();
+    try {
+        delete require.cache[require.resolve(`./modules/express/${type}.js`)];
+        response.json({200: `Successfully reloaded ${type} module!`});
+    } catch (e) {
+        //  On error
+    }
 });
 
 // 
 // Miscellaneous functions
 // 
 
-function appendAudit(file, line) {
-    fs.appendFile(`./logs/${file}.txt`, line, (err) => { if (err) console.error(err) })
+function appendAudit(file, line, stringify=false) {
+    console.log(line);
+    if (stringify) {
+        line = JSON.stringify(line);
+    }
+    fs.appendFile(`./logs/${file}.txt`, line + "\n", (err) => { if (err) console.error(err) })
+}
+
+function respondJSON(response, content, stringify) {
+    appendAudit(auditFile, content, stringify);
+    response.json(content);
 }
