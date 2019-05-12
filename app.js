@@ -95,11 +95,13 @@ bot.on("guildCreate", guild => {
 });
 
 bot.on("error", err => {
-    console.log(err);
+    console.log(`> An error has occured, please check log file "/logs/${auditFile}.txt" for more information.`);
     appendAudit(auditFile, err);
+
 });
 
 bot.on("disconnect", () => {
+    console.log(`> An error resulting in the Discord bot disconnecting has occured. Trying to connect again.`)
     bot.login(conf.botToken);
 })
 
@@ -148,7 +150,7 @@ app.get('/api/verify/:userId(\\d+)/secret/:secretId', function (request, respons
     }
 
     if (!accept) {
-        response.json({"401": "Key is not accepted", "secret": expressArgs.secretId});
+        response.json({"401": "Secret is not accepted"});
         return;
     }
 
@@ -161,7 +163,7 @@ app.get('/api/verify/:userId(\\d+)/secret/:secretId', function (request, respons
     if (!guild.me.hasPermission("MANAGE_ROLES")) {
         console.log(`\n> Bot instance lacks permission: MANAGE_ROLES`);
         appendAudit(auditFile, `\n> Bot instance lacks permission: MANAGE_ROLES`);
-        return response.json({"401": "Bot lacks permission"});
+        return response.json({"401": "Bot lacks permission (MANAGE_ROLES)"});
     } else {
         try {
             guild.members.find(user => user.id, expressArgs.userId).addRole(expressArgs.roleID)
@@ -200,8 +202,8 @@ app.get('/api/secret/generate/:botSecret', function (request, response) {
 app.get('/api/status', function (request, response) {
     // TODO - write in-depth status response code
     response.json({"status": 200});
-    console.log(`\nstatus requested, current status = 200`);
-    appendAudit(auditFile, `\nstatus requested, current status = 200`);
+    console.log(`\nStatus requested, current status = 200`);
+    appendAudit(auditFile, `\nStatus requested, current status = 200`);
 });
 
 // 
