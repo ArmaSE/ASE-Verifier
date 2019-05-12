@@ -144,7 +144,7 @@ app.listen(expressPort, () => {
     appendAudit(auditFile, `== Express ==\n> Listening on port: ${expressPort}`);
 });
 
-app.put('/api/verify/:userId(\\d+)/secret/:secretId', function (request, response) {
+app.put('/api/guild/verify/:userId(\\d+)/secret/:secretId', function (request, response) {
     let expressArgs = request.params;
     expressArgs.guildID = conf.verifyGuildID;
     expressArgs.roleID = conf.verifyRoleID;
