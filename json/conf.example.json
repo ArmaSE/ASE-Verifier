@@ -11,5 +11,9 @@
     
     "verifyGuildID": "ID of the guild where verification should occur",
     "verifyRoleID": "ID of the role that should be given upon verification",
-    "port": "8080"
+    "port": 8080,
+    "readExpressModules": true,
+    "storeMessages": true,
+    "storeCount": 100,
+    "getMessagesFrom": "ID of channel"
 }
