@@ -63,7 +63,9 @@ fs.readdir("./modules/", (err, files) => {
 // On new message seen by bot
 bot.on("message", msg => {
     // Stores message if the ID of the channel corresponds to the ID saved in conf.json
-    storeMessage(messageStore.convertMessage(msg));
+    if (msg.channel.id == conf.getMessagesFrom) {
+        storeMessage(messageStore.convertMessage(msg));
+    }
 
     // Trim content, ignore if author is bot, and only continue if prefix is present
     const message = msg.content.trim();
@@ -215,7 +217,7 @@ app.get('/api/guild/messages/:amount', function (request, response) {
     response.type('application/xml');
     // response.send(builder.buildObject(newObj));
     response.send(builder.buildObject(messageArray));
-    console.log(messageArray);
+    appendAudit(auditFile, `> GET request | Latest messages (amount: ${request.params.amount}, actual amount: ${messageIndex.length})`);
 });
 
 app.get('/api/guild/members/', function (request, response) {
@@ -233,6 +235,18 @@ app.get('/adm/reload/:type', function (request, response) {
     } catch (e) {
         //  On error
     }
+});
+
+app.get('/adm/log/show', function (request, response) {
+    let currentLog = fs.readFile(`./logs/${auditFile}.txt`, 'utf-8', function (err, data) {
+        if (err) {
+            response.send('Could not get log');
+        } else {
+            response.send(data);
+        }
+    });
+
+    currentLog = undefined;
 });
 
 // 
