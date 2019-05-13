@@ -254,15 +254,23 @@ function respondJSON(response, content, stringify) {
 
 function storeMessage(message) {
     if (conf.storeCount < (messageIndex.length)) {
-        messages[messageIndex[99]] = undefined;
-        messageIndex.pop();
+        try {
+            messages[messageIndex[99]] = undefined;
+            messageIndex.pop();
 
-        messageIndex.unshift(`ID${message.content.id}`);
-        messages[`ID${message.content.id}`] = message;
-        console.log(`Message log capacity reached, removing oldest message`);
+            messageIndex.unshift(`ID${message.content.id}`);
+            messages[`ID${message.content.id}`] = message;
+            console.log(`Message log capacity reached, removing oldest message`);
+        } catch (e) {
+            appendAudit(auditFile, 'Error has occured when trying to store message. (Array filled)');
+        }
     } else {
-        messageIndex.unshift(`ID${message.content.id}`);
-        messages[`ID${message.content.id}`] = message;
-        console.log(`Messages added to array, current message count: ${messageIndex.length}`);
+        try {
+            messageIndex.unshift(`ID${message.content.id}`);
+            messages[`ID${message.content.id}`] = message;
+            console.log(`Messages added to array, current message count: ${messageIndex.length}`);
+        } catch (e) {
+            appendAudit(auditFile, 'Error has occured when trying to store message. (Array not filled yet)');
+        }        
     }
 }
