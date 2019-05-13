@@ -21,9 +21,6 @@ let expressModules = {
     POST: "./modules/express/post.js"
 }
 
-let messages = {};
-let messageIndex = [];
-
 // On successful connection to Discord
 bot.on("ready", () => {
     init();
@@ -40,7 +37,7 @@ function init() {
     let initLog = `== Discord ==\n> Successfully connected to Discord (${new Date().getTime() - startTime} ms)!\n> Name of bot: ${bot.user.username}\n> Current activity: ${conf.activity}\n> Bot ID: ${conf.botID}\n> Prefix: ${conf.prefix}\n> Enable guild command cogs: ${conf.enableResponses}\n> Enable reading Express modules: ${conf.readExpressModules}\n> Developer mode: ${conf.indev}\n== EndInit ==`;
     appendAudit(auditFile, initLog);
     initialized = true;
-    fs.writeFile('.//json/conf.json', JSON.stringify(conf, null, 4), (err) => { if (err) console.error(err) });
+    fs.writeFile('./json/conf.json', JSON.stringify(conf, null, 4), (err) => { if (err) console.error(err) });
 }
 
 // 
@@ -201,14 +198,17 @@ app.get('/api/status', function (request, response) {
 
 app.get('/api/guild/messages/:amount', function (request, response) {
 
+    let messages = require('./json/store/messages.json');
+    let messageList = Object.keys(messages);
+
     let limit = request.params.amount;
-    if (limit > 100) {
-        limit = 100;
+    if (limit > conf.storeCount) {
+        limit = conf.storeCount;
     } else if (limit < 1) {
-        limit = 100;
+        limit = conf.storeCount;
     }
 
-    preparedArray = messageIndex.slice(0, limit);
+    preparedArray = messageList.slice((messageList.length - limit), (messageList.length)).reverse();
     messageArray = {};
     preparedArray.forEach((id) => {
         messageArray[id] = messages[id];
@@ -217,7 +217,7 @@ app.get('/api/guild/messages/:amount', function (request, response) {
     response.type('application/xml');
     // response.send(builder.buildObject(newObj));
     response.send(builder.buildObject(messageArray));
-    appendAudit(auditFile, `> GET request | Latest messages (amount: ${request.params.amount}, actual amount: ${messageIndex.length})`);
+    appendAudit(auditFile, `> GET request | Latest messages (amount: ${request.params.amount}, actual amount: ${preparedArray.length})`);
 });
 
 app.get('/api/guild/members/', function (request, response) {
@@ -267,24 +267,27 @@ function respondJSON(response, content, stringify) {
 }
 
 function storeMessage(message) {
-    if (conf.storeCount < (messageIndex.length)) {
-        try {
-            messages[messageIndex[99]] = undefined;
-            messageIndex.pop();
+    messages = require('./json/store/messages');
 
-            messageIndex.unshift(`ID${message.content.id}`);
-            messages[`ID${message.content.id}`] = message;
-            console.log(`Message log capacity reached, removing oldest message`);
-        } catch (e) {
-            appendAudit(auditFile, 'Error has occured when trying to store message. (Array filled)');
-        }
+    messages[`ID${message.content.id}`] = message;
+    let messageList = Object.keys(messages);
+    console.log(`> Messages added to array, current message count: ${messageList.length}`);
+
+    if (messageList.length > conf.storeCount) {
+        console.log(`> Message log capacity surpassed, removing oldest message`);
+        messages[messageList.shift()] = undefined;
+        fs.writeFile('./json/store/messages.json', JSON.stringify(messages, null, 4), (err) => {
+            if (err) {
+                console.log(err);
+            }
+        });
     } else {
-        try {
-            messageIndex.unshift(`ID${message.content.id}`);
-            messages[`ID${message.content.id}`] = message;
-            console.log(`Messages added to array, current message count: ${messageIndex.length}`);
-        } catch (e) {
-            appendAudit(auditFile, 'Error has occured when trying to store message. (Array not filled yet)');
-        }        
+        fs.writeFile('./json/store/messages.json', JSON.stringify(messages, null, 4), (err) => { 
+            if (err) {
+                console.log(err);
+            } 
+        });
     }
+
+    delete require.cache[require.resolve(`./json/store/messages.json`)];
 }
