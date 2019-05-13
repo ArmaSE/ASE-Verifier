@@ -57,3 +57,5 @@ json/keys-attr.json
 json/store/messages.json
 logs/*
 temp
+temp.*
+respondOnce.js
