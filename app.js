@@ -101,6 +101,29 @@ bot.on("message", msg => {
     }
 });
 
+bot.on("messageDelete", (deletedMessage) => {
+    let idString = `ID${deletedMessage.id}`;
+    appendAudit(auditFile, `> messageDelete invoked. ID = ${idString}`);
+    let messages = require('./json/store/messages.json');
+    let messageList = Object.keys(messages);
+
+    messageList.forEach((id) => {
+        if (id == idString) {
+            appendAudit(auditFile, `> Message (ID: ${deletedMessage.id}) was deleted, removing from messageStore.`)
+            messages[id] = undefined;
+            fs.writeFile('./json/store/messages.json', JSON.stringify(messages, null, 4), (err) => {
+                if (err) {
+                    console.log(err);
+                }
+            });
+        } else {
+            return;
+        }
+    });
+    // END
+    delete require.cache[require.resolve(`./json/store/messages.json`)];
+});
+
 // On joining new Discord server
 bot.on("guildCreate", guild => {
     appendAudit(auditFile, `Guild joined: ${guild.name}`);
@@ -222,6 +245,8 @@ app.get('/api/guild/messages/:amount', function (request, response) {
     // response.send(builder.buildObject(newObj));
     response.send(builder.buildObject(messageArray));
     appendAudit(auditFile, `> GET request | Latest messages (amount: ${request.params.amount}, actual amount: ${preparedArray.length})`);
+
+    delete require.cache[require.resolve(`./json/store/messages.json`)];
 });
 
 app.get('/api/guild/members/', function (request, response) {
