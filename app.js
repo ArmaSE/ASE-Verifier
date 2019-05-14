@@ -208,6 +208,10 @@ app.get('/api/guild/messages/:amount', function (request, response) {
         limit = conf.storeCount;
     }
 
+    if (request.params.amount > messageList.length) {
+        limit = messageList.length;
+    }
+
     preparedArray = messageList.slice((messageList.length - limit), (messageList.length)).reverse();
     messageArray = {};
     preparedArray.forEach((id) => {
