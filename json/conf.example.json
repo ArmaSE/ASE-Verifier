@@ -15,5 +15,5 @@
     "readExpressModules": true,
     "storeMessages": true,
     "storeCount": 100,
-    "getMessagesFrom": "ID of channel"
+    "getMessagesFrom": "ID of guild where messages should be read"
 }
