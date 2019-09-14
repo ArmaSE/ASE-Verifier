@@ -38,6 +38,15 @@ function init() {
     appendAudit(auditFile, initLog);
     initialized = true;
     fs.writeFile('./json/conf.json', JSON.stringify(conf, null, 4), (err) => { if (err) console.error(err) });
+
+    fs.readFile('./json/store/messages.json', (err, data) => {
+        if (err) throw err;
+
+        if (data == '') {
+            fs.writeFile('./json/store/messages.json', JSON.stringify({}, null, 4), (err) => { if (err) console.error(err) });
+        }
+    })
+    delete require.cache[require.resolve(`./json/store/messages.json`)];
 }
 
 // 
@@ -123,6 +132,31 @@ bot.on("messageDelete", (deletedMessage) => {
     // END
     delete require.cache[require.resolve(`./json/store/messages.json`)];
 });
+
+bot.on("messageUpdate", (oldMessage, newMessage) => {
+    let idString = `ID${oldMessage.id}`;
+    appendAudit(auditFile, `> editMessage invoked. ID = ${idString}`);
+    let messages = require('./json/store/messages.json');
+    let messageList = Object.keys(messages);
+
+    messageList.forEach((id) => {
+        if (id == idString) {
+            appendAudit(auditFile, `> Message (ID: ${oldMessage.id}) was edited, updating messageStore.`)
+            appendAudit(auditFile, `      -> Old Content: ${oldMessage.content}`)
+            appendAudit(auditFile, `      -> New Content: ${newMessage.content}`)
+            messages[id] = messageStore.convertMessage(newMessage);
+            fs.writeFile('./json/store/messages.json', JSON.stringify(messages, null, 4), (err) => {
+                if (err) {
+                    console.log(err);
+                }
+            });
+        } else {
+            return;
+        }
+    });
+    // END
+    delete require.cache[require.resolve(`./json/store/messages.json`)];
+})
 
 // On joining new Discord server
 bot.on("guildCreate", guild => {
