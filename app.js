@@ -69,7 +69,7 @@ fs.readdir("./modules/", (err, files) => {
 // On new message seen by bot
 bot.on("message", msg => {
     // Stores message if the ID of the channel corresponds to the ID saved in conf.json
-    if (msg.channel.id == conf.getMessagesFrom) {
+    if (msg.guild.id == conf.getMessagesFrom) {
         storeMessage(messageStore.convertMessage(msg));
     }
 
