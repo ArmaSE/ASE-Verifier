@@ -71,6 +71,10 @@ bot.on("message", msg => {
     // Stores message if the ID of the channel corresponds to the ID saved in conf.json
     if (msg.guild.id == conf.getMessagesFrom) {
         storeMessage(messageStore.convertMessage(msg));
+
+        if (!fs.existsSync(`./json/store/${msg.guild.id}`)) {
+            fs.writeFileSync(`./json/store/${msg.guild.id}`, JSON.stringify({}, null, 4), (err) => { if (err) console.error(err) });
+        }
     }
 
     // Trim content, ignore if author is bot, and only continue if prefix is present
@@ -353,4 +357,30 @@ function storeMessage(message) {
     }
 
     delete require.cache[require.resolve(`./json/store/messages.json`)];
+}
+
+function storeChannelMessage(message, id) {
+    file = require(`./json/store/${id}`);
+
+    file[`ID${id}`] = message;
+    let messageList = Object.keys(messages);
+    console.log(`> Messages added to channel-specific array, current message count: ${messageList.length}. Channel ID: ${id}`);
+
+    if (messageList.length > conf.storeCount) {
+        console.log(`> Message log capacity surpassed for channel ID: ${id}, removing oldest message`);
+        file[messageList.shift()] = undefined;
+        fs.writeFile(`./json/store/${id}.json`, JSON.stringify(messages, null, 4), (err) => {
+            if (err) {
+                console.log(err);
+            }
+        });
+    } else {
+        fs.writeFile(`./json/store/${id}.json`, JSON.stringify(messages, null, 4), (err) => {
+            if (err) {
+                console.log(err);
+            }
+        });
+    }
+
+    delete require.cache[require.resolve(`./json/store/${id}.json`)];
 }
