@@ -60,3 +60,4 @@ temp
 temp.*
 respondOnce.js
 json/conf_backup.json
+json/store/*.json

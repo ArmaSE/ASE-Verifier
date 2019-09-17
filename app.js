@@ -40,13 +40,14 @@ function init() {
     fs.writeFile('./json/conf.json', JSON.stringify(conf, null, 4), (err) => { if (err) console.error(err) });
 
     fs.readFile('./json/store/messages.json', (err, data) => {
-        if (err) throw err;
+        if (err) {
+            fs.writeFile('./json/store/messages.json', JSON.stringify({}, null, 4), (err) => { if (err) console.error(err) });
+        }
 
         if (data == '') {
             fs.writeFile('./json/store/messages.json', JSON.stringify({}, null, 4), (err) => { if (err) console.error(err) });
         }
     })
-    delete require.cache[require.resolve(`./json/store/messages.json`)];
 }
 
 // 
@@ -70,11 +71,14 @@ fs.readdir("./modules/", (err, files) => {
 bot.on("message", msg => {
     // Stores message if the ID of the channel corresponds to the ID saved in conf.json
     if (msg.guild.id == conf.getMessagesFrom) {
-        storeMessage(messageStore.convertMessage(msg));
+        convertedMessage = messageStore.convertMessage(msg);
 
-        if (!fs.existsSync(`./json/store/${msg.guild.id}`)) {
-            fs.writeFileSync(`./json/store/${msg.guild.id}`, JSON.stringify({}, null, 4), (err) => { if (err) console.error(err) });
+        if (!fs.existsSync(`./json/store/${msg.channel.id}.json`)) {
+            fs.writeFileSync(`./json/store/${msg.channel.id}.json`, JSON.stringify({}, null, 4), (err) => { if (err) console.error(err) });
         }
+
+        storeMessage(convertedMessage);
+        storeChannelMessage(convertedMessage, msg.channel.id);
     }
 
     // Trim content, ignore if author is bot, and only continue if prefix is present
@@ -133,8 +137,26 @@ bot.on("messageDelete", (deletedMessage) => {
             return;
         }
     });
+
+    let channelStore = require(`./json/store/${deletedMessage.channel.id}.json`);
+    let channelMessageList = Object.keys(channelStore);
+
+    channelMessageList.forEach((id) => {
+        if (id == idString) {
+            appendAudit(auditFile, `> Message (ID: ${deletedMessage.id}) was deleted, removing from channelStore (ID: ${deletedMessage.channel.id}).`);
+            channelStore[id] = undefined;
+            fs.writeFile(`./json/store/${deletedMessage.channel.id}.json`, JSON.stringify(channelStore, null, 4), (err) => {
+                if (err) {
+                    console.log(err);
+                }
+            });
+        } else {
+            return;
+        }
+    });
     // END
     delete require.cache[require.resolve(`./json/store/messages.json`)];
+    delete require.cache[require.resolve(`./json/store/${deletedMessage.channel.id}.json`)];
 });
 
 bot.on("messageUpdate", (oldMessage, newMessage) => {
@@ -158,8 +180,28 @@ bot.on("messageUpdate", (oldMessage, newMessage) => {
             return;
         }
     });
+
+    let channelStore = require(`./json/store/${oldMessage.channel.id}.json`);
+    let channelMessageList = Object.keys(channelStore);
+
+    channelMessageList.forEach((id) => {
+        if (id == idString) {
+            appendAudit(auditFile, `> Message (ID: ${oldMessage.id}) was edited, updating channelStore (ID: ${oldMessage.channel.id}).`)
+            appendAudit(auditFile, `      -> Old Content: ${oldMessage.content}`)
+            appendAudit(auditFile, `      -> New Content: ${newMessage.content}`)
+            channelStore[id] = messageStore.convertMessage(newMessage);
+            fs.writeFile(`./json/store/${oldMessage.channel.id}.json`, JSON.stringify(messages, null, 4), (err) => {
+                if (err) {
+                    console.log(err);
+                }
+            });
+        } else {
+            return;
+        }
+    });
     // END
     delete require.cache[require.resolve(`./json/store/messages.json`)];
+    delete require.cache[require.resolve(`./json/store/${oldMessage.channel.id}.json`)];
 })
 
 // On joining new Discord server
@@ -382,5 +424,8 @@ function storeChannelMessage(message, id) {
         });
     }
 
+    message = undefined;
+    file = undefined;
+    messageList = undefined;
     delete require.cache[require.resolve(`./json/store/${id}.json`)];
 }
