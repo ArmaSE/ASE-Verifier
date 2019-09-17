@@ -329,6 +329,36 @@ app.get('/api/guild/messages/:amount', function (request, response) {
     delete require.cache[require.resolve(`./json/store/messages.json`)];
 });
 
+app.get('/api/guild/channel/:channelId/messages/:amount', function (request, response) {
+    console.log('Hi!')
+    let messages = require(`./json/store/${request.params.channelId}.json`);
+    let messageList = Object.keys(messages);
+
+    let limit = request.params.amount;
+    if (limit > conf.storeCount) {
+        limit = conf.storeCount;
+    } else if (limit < 1) {
+        limit = conf.storeCount;
+    }
+
+    if (request.params.amount > messageList.length) {
+        limit = messageList.length;
+    }
+
+    preparedArray = messageList.slice((messageList.length - limit), (messageList.length)).reverse();
+    messageArray = {};
+    preparedArray.forEach((id) => {
+        messageArray[id] = messages[id];
+    })
+
+    response.type('application/xml');
+    // response.send(builder.buildObject(newObj));
+    response.send(builder.buildObject(messageArray));
+    appendAudit(auditFile, `> GET request | Latest messages (amount: ${request.params.amount}, actual amount: ${preparedArray.length}), from channel (ID: ${request.params.channelId})`);
+
+    delete require.cache[require.resolve(`./json/store/${request.params.channelId}.json`)];
+});
+
 app.get('/api/guild/members/', function (request, response) {
     let guildMemberCount = bot.guilds.find(guild => guild.id, conf.verifyGuildID).memberCount;
 
