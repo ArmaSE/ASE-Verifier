@@ -1,0 +1,10 @@
+{
+    "bot_version": "0.0.2b",
+    "bot_indev": "0",
+    "bot_prefix": "§§",
+    "bot_enable_responses": "0",
+    "app_port": "80",
+    "app_read_express_modules": "1",
+    "app_store_messages": "1",
+    "app_store_amount": "200"
+}
