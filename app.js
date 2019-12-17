@@ -6,10 +6,12 @@ const Discord = require('discord.js');
 const Express = require('express');
 const xml = require('xml2js');
 const fs = require('fs');
+const sql = require('sqlite3').verbose();
 const conf = require('./json/conf.json');
 const messageStore = require('./helpers/messageStore.js');
 
 var initialized = false;
+var db = new sql.Database('main.db');
 const bot = new Discord.Client();
 const app = Express();
 const builder = new xml.Builder();
