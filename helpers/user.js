@@ -144,6 +144,7 @@ class user {
                         resolve(true);
                     }).catch((err) => {
                         sql.toLog('User search returned no results', 'api_user', 1);
+                        sql.toLog(err, 'error', 2);
                         resolve(false);
                     });
             } catch (e) {
