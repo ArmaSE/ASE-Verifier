@@ -1,356 +1,351 @@
-const startTime = new Date().getTime();
-const auditFile = startTime;
+var init = false;
 
-// Necessary files/libs
-const Discord = require('discord.js');
+// Necessary libs
+const discord = require('discord.js');
 const Express = require('express');
-const xml = require('xml2js');
-const fs = require('fs');
-const conf = require('./json/conf.json');
-const messageStore = require('./helpers/messageStore.js');
+const msg_req = require('./helpers/msg-helper.js');
+const api_req = require('./helpers/api.js');
+const con_req = require('./helpers/db.js');
+const usr_req = require('./helpers/user.js');
+let bodyParser = require('body-parser');
 
-var initialized = false;
-const bot = new Discord.Client();
+// Initial vars and constants
+const bot = new discord.Client();
 const app = Express();
-const builder = new xml.Builder();
-const expressPort = conf.port;
+let settings = null;
+let Msg = new msg_req();
+let Api = new api_req();
+let Usr = new usr_req();
+let Con = new con_req();
 
-let expressModules = {
-    GET: "./modules/express/get.js",
-    PUT: "./modules/express/put.js",
-    POST: "./modules/express/post.js"
-}
+Con.toLog(`App started`);
 
-// On successful connection to Discord
-bot.on("ready", () => {
-    init();
-});
-
-// Initialize the bot.
-function init() {
-    if (initialized) return;
-
-    conf.botName = bot.user.username;
-    conf.botID = bot.user.id;
-    bot.user.setActivity(conf.activity, { type: "PLAYING" });
-
-    let initLog = `== Discord ==\n> Successfully connected to Discord (${new Date().getTime() - startTime} ms)!\n> Name of bot: ${bot.user.username}\n> Current activity: ${conf.activity}\n> Bot ID: ${conf.botID}\n> Prefix: ${conf.prefix}\n> Enable guild command cogs: ${conf.enableResponses}\n> Enable reading Express modules: ${conf.readExpressModules}\n> Developer mode: ${conf.indev}\n== EndInit ==`;
-    appendAudit(auditFile, initLog);
-    initialized = true;
-    fs.writeFile('./json/conf.json', JSON.stringify(conf, null, 4), (err) => { if (err) console.error(err) });
-
-    fs.readFile('./json/store/messages.json', (err, data) => {
-        if (err) throw err;
-
-        if (data == '') {
-            fs.writeFile('./json/store/messages.json', JSON.stringify({}, null, 4), (err) => { if (err) console.error(err) });
-        }
-    })
-    delete require.cache[require.resolve(`./json/store/messages.json`)];
-}
-
-// 
-// Discord stuff
-// 
-
-// Funtion to read in the dynamic cogs ('modules' folder), except for modules in "modules/express"
-// Made to be able to update the modules without restarting the bot.
-fs.readdir("./modules/", (err, files) => {
-    if (conf.enableResponses == false) return; // Ignore rest if this variable is set to false in the config
-
-    if (err) return console.error(err);
-    files.forEach(file => {
-        let evtFunction = require(`./modules/${file}`);
-        let evtName = file.split(".")[0];
-        bot.on(evtName, (...args) => evtFunction.run(bot, ...args));
+Api.settings.retrieve().then(function (result) {
+    settings = result;
+    Con.toLog('Attempting Discord login', 'discord_api');
+    bot.login(settings['bot_token']);
+    app.listen(settings['app_port'], () => {
+        Con.toLog(`Express application initialized`, 'express_api');
     });
+    Msg.store.size();
+    Usr.setSettings = settings;
 });
 
-// On new message seen by bot
-bot.on("message", msg => {
-    // Stores message if the ID of the channel corresponds to the ID saved in conf.json
-    if (msg.guild.id == conf.getMessagesFrom) {
-        storeMessage(messageStore.convertMessage(msg));
+/*
+    == Bot functions ==
+*/
+
+bot.on("ready", () => {
+    Con.toLog('Discord Bot Initialized', 'discord_api');
+
+    if (bot.user.username !== settings['bot_name']) {
+        Con.toLog(`bot_name mismatch in settings. Updating.`, 'settings');
+        Api.settings.update('bot_name', bot.user.username);
     }
 
-    // Trim content, ignore if author is bot, and only continue if prefix is present
-    const message = msg.content.trim();
-    if (msg.author.bot) return;
-    if (!msg.content.startsWith(conf.prefix)) return;
+    if (bot.user.id !== settings['bot_id']) {
+        Con.toLog(`bot_id mismatch in settings. Updating.`, 'settings');
+        Api.settings.update('bot_id', bot.user.id);
+    }
 
-    // Split the whole message per word into argument array, and initial command variable
-    let args = msg.content.split(" ").slice(1);
-    const command = message.split(/[ \n]/)[0].substring(conf.prefix.length).toLowerCase().trim();
-
-    try {
-        if (conf.enableResponses) {
-            // If command corresponds to cog with the same name, continue and pass message info and arguments to the cog
-            let cmdFile = require(`./modules/${command}.js`);
-            cmdFile.run(bot, msg, args, conf);
-        }
-    } catch (e) {
-        // Module not found, send error message in channel, and log the error in the console
-        console.error(e);
-        msg.channel.sendMessage("", {
-            embed: {
-                color: 16711680,
-                author: {
-                    name: bot.user.username,
-                    icon_url: bot.user.avatarURL,
-                },
-                title: `Error: Module not found`,
-                description: `Module ${command} does not exist. type **"${conf.prefix}list modules"** to see all available modules.`,
-                timestamp: new Date(),
-                footer: {
-                    icon_url: msg.author.avatarURL,
-                    text: `${msg.author.username}`
-                }
+    if (settings['bot_activity'] !== '') {
+        bot.user.setPresence({
+            game: {
+                name: settings['bot_activity_name'],
+                type: settings['bot_activity'],
+                url: settings['bot_activity_url']
             }
-        });
+        })
+    }
+});
+
+bot.on("message", message => {
+    if (message.guild.id == settings['bot_guild_id']) {
+        Msg.store.add(Msg.toObject(message, settings), settings);
     }
 });
 
 bot.on("messageDelete", (deletedMessage) => {
-    let idString = `ID${deletedMessage.id}`;
-    appendAudit(auditFile, `> messageDelete invoked. ID = ${idString}`);
-    let messages = require('./json/store/messages.json');
-    let messageList = Object.keys(messages);
-
-    messageList.forEach((id) => {
-        if (id == idString) {
-            appendAudit(auditFile, `> Message (ID: ${deletedMessage.id}) was deleted, removing from messageStore.`)
-            messages[id] = undefined;
-            fs.writeFile('./json/store/messages.json', JSON.stringify(messages, null, 4), (err) => {
-                if (err) {
-                    console.log(err);
-                }
-            });
-        } else {
-            return;
-        }
-    });
-    // END
-    delete require.cache[require.resolve(`./json/store/messages.json`)];
+    if (deletedMessage.guild.id == settings['bot_guild_id']) {
+        Con.toLog('DeleteMessage Invoked. Synchronizing message_store', 'discord_api');
+        Msg.store.remove(deletedMessage.id);
+    }
 });
 
 bot.on("messageUpdate", (oldMessage, newMessage) => {
-    let idString = `ID${oldMessage.id}`;
-    appendAudit(auditFile, `> editMessage invoked. ID = ${idString}`);
-    let messages = require('./json/store/messages.json');
-    let messageList = Object.keys(messages);
-
-    messageList.forEach((id) => {
-        if (id == idString) {
-            appendAudit(auditFile, `> Message (ID: ${oldMessage.id}) was edited, updating messageStore.`)
-            appendAudit(auditFile, `      -> Old Content: ${oldMessage.content}`)
-            appendAudit(auditFile, `      -> New Content: ${newMessage.content}`)
-            messages[id] = messageStore.convertMessage(newMessage);
-            fs.writeFile('./json/store/messages.json', JSON.stringify(messages, null, 4), (err) => {
-                if (err) {
-                    console.log(err);
-                }
-            });
-        } else {
-            return;
-        }
-    });
-    // END
-    delete require.cache[require.resolve(`./json/store/messages.json`)];
-})
-
-// On joining new Discord server
-bot.on("guildCreate", guild => {
-    appendAudit(auditFile, `Guild joined: ${guild.name}`);
+    if (oldMessage.guild.id == settings['bot_guild_id']) {
+        Con.toLog('UpdateMessage Invoked. Synchronizing message_store', 'discord_api');
+        Msg.store.alter(oldMessage, newMessage, settings);
+    }
 });
 
-bot.on("error", err => {
-    appendAudit(auditFile, err);
+bot.on("guildCreate", (guild) => {
+    Con.toLog(`Bot has joined new guild. Guild name: ${guild.name}`, 'discord_api', 1);
+});
 
+bot.on("error", (err) => {
+    Con.toLog(err, 'discord_api', 'discord_api_error', 2);
 });
 
 bot.on("disconnect", () => {
-    appendAudit(auditFile, `> An error resulting in the Discord bot disconnecting has occured. Trying to connect again.`)
-    bot.login(conf.botToken);
+    Con.toLog(`Bot was disconnected from the Discord API. Attempting reconnect`, 'discord_api_error', 2);
+    bot.login(settings['bot_token']);
 })
 
-// Connect to Discord
-bot.login(conf.botToken);
+/*
+    == Express functions ==
+*/
 
-// 
-// Express stuff
-// 
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// Same as module reading for Discord, but only for express modules.
-// Made to be able to update the modules without restarting the bot.
-fs.readdir("./modules/express/", (err, files) => {
-    if (!conf.readExpressModules) return;
-    appendAudit(auditFile, `> Loading Express modules`);
-    let responseTime = new Date().getTime();
-    if (err) return console.log(err);
-    files.forEach(file => {
-        let evtFunction = require(`./modules/express/${file}`);
-        let evtName = file.split(".")[0];
-        bot.on(evtName, (...args) => evtFunction.run(bot, ...args));
-    });
-    responseTime = new Date().getTime() - responseTime;
-    appendAudit(auditFile, `> Finished loading Express modules (${responseTime} ms)`);
-});
-
-app.listen(expressPort, () => {
-    appendAudit(auditFile, `== Express ==\n> Listening on port: ${expressPort}`);
-});
-
-app.put('/api/guild/verify/:userId(\\d+)/secret/:secretId', function (request, response) {
-    let expressArgs = request.params;
-    expressArgs.guildID = conf.verifyGuildID;
-    expressArgs.roleID = conf.verifyRoleID;
-
-    let cog = require(`./modules/express/put.js`);
-    let roleHelper = require('./helpers/role-verification.js');
-
-    if (!cog.verifySecret(expressArgs.secretId)) {
-        respondJSON(response, { "401": "Secret is not accepted" });
-        return;
+app.get('/api/status', function(req, res) {
+    let statusMessage = {
+        "discord": bot.status,
+        "express": 200
     }
-
-    appendAudit(auditFile, `\n> Verification request from: ${expressArgs.secretId}`);
-
-    // Gets the guild by using the ID specified in the config
-    let guild = bot.guilds.find(guild => guild.id, conf.verifyGuildID);
-
-    if (!roleHelper.verifyRolePermission(guild, "MANAGE_ROLES")) {
-        return respondJSON(response, { "401": "Bot lacks permission (MANAGE_ROLES)" });
-    } else {
-        try {
-            guild.members.find(user => user.id, expressArgs.userId).addRole(expressArgs.roleID);
-        } catch (e) {
-            return respondJSON(response, { "401": "The user may be above the role hierarchy" });
-        }
-
-        expressArgs.secretId = undefined;
-        sendRes = { "200": "User verified", "userID": expressArgs.userId, "roleID": expressArgs.roleID };
-        return respondJSON(response, sendRes);
-    }
+    res.json(statusMessage);
 });
 
-app.post('/api/secret/generate/:botSecret', function (request, response) {
-    if (request.params.botSecret !== conf.botToken) {
-        appendAudit(auditFile, "bot secret mismatch");
-        return response.json({ "401": "bot secret mismatch" });
-    } else {
-        let hat = require('hat');
-        let cog = require(expressModules.POST);
-        let id = cog.generateSecret();
-        appendAudit(auditFile, `\n> Generated new secret: ${id}`)
-        response.json({ "secretId": id });
-    }
-});
-
-// Get status of the service
-app.get('/api/status', function (request, response) {
-    let cog = require('./modules/express/get.js');
-    let res = cog.getStatus(bot.status);
-    respondJSON(response, res, true);
-});
-
-app.get('/api/guild/messages/:amount', function (request, response) {
-
-    let messages = require('./json/store/messages.json');
-    let messageList = Object.keys(messages);
-
-    let limit = request.params.amount;
-    if (limit > conf.storeCount) {
-        limit = conf.storeCount;
-    } else if (limit < 1) {
-        limit = conf.storeCount;
-    }
-
-    if (request.params.amount > messageList.length) {
-        limit = messageList.length;
-    }
-
-    preparedArray = messageList.slice((messageList.length - limit), (messageList.length)).reverse();
-    messageArray = {};
-    preparedArray.forEach((id) => {
-        messageArray[id] = messages[id];
-    })
-
-    response.type('application/xml');
-    // response.send(builder.buildObject(newObj));
-    response.send(builder.buildObject(messageArray));
-    appendAudit(auditFile, `> GET request | Latest messages (amount: ${request.params.amount}, actual amount: ${preparedArray.length})`);
-
-    delete require.cache[require.resolve(`./json/store/messages.json`)];
-});
-
-app.get('/api/guild/members/', function (request, response) {
-    let guildMemberCount = bot.guilds.find(guild => guild.id, conf.verifyGuildID).memberCount;
-
-    response.json({members: guildMemberCount});
-});
-
-// Reload defined Express module
-app.get('/adm/reload/:type', function (request, response) {
-    let type = request.params.type.toLowerCase();
-    try {
-        delete require.cache[require.resolve(`./modules/express/${type}.js`)];
-        response.json({ 200: `Successfully reloaded ${type} module!` });
-    } catch (e) {
-        //  On error
-    }
-});
-
-app.get('/adm/log/show', function (request, response) {
-    let currentLog = fs.readFile(`./logs/${auditFile}.txt`, 'utf-8', function (err, data) {
-        if (err) {
-            response.send('Could not get log');
-        } else {
-            response.send(data);
-        }
-    });
-
-    currentLog = undefined;
-});
-
-// 
-// Miscellaneous functions
-// 
-
-function appendAudit(file, line, stringify = false) {
-    console.log(line);
-    if (stringify) {
-        line = JSON.stringify(line);
-    }
-    fs.appendFile(`./logs/${file}.txt`, line + "\n", (err) => { if (err) console.error(err) })
-}
-
-function respondJSON(response, content, stringify) {
-    appendAudit(auditFile, content, stringify);
-    response.json(content);
-}
-
-function storeMessage(message) {
-    messages = require('./json/store/messages');
-
-    messages[`ID${message.content.id}`] = message;
-    let messageList = Object.keys(messages);
-    console.log(`> Messages added to array, current message count: ${messageList.length}`);
-
-    if (messageList.length > conf.storeCount) {
-        console.log(`> Message log capacity surpassed, removing oldest message`);
-        messages[messageList.shift()] = undefined;
-        fs.writeFile('./json/store/messages.json', JSON.stringify(messages, null, 4), (err) => {
-            if (err) {
-                console.log(err);
+app.get('/api/logs/:action', function (req, res) {
+    Con.toLog(`API Call: /api/logs/${req.params.action}`, 'express_api');
+    let ret;
+    switch(req.params.action.toLocaleLowerCase()) {
+        case "show":
+            if (req.params.limit !== undefined && req.params.category !== undefined && req.params.severity !== undefined) {
+                Con.fromLog(Number(req.params.limit), req.params.category, req.params.severity).then((resp) => {
+                    res.json(resp);
+                });;
+            } else if (req.params.limit !== undefined && req.params.category !== undefined) {
+                Con.fromLog(Number(req.params.limit), req.params.category).then((resp) => {
+                    res.json(resp);
+                });;
+            }  else if (req.params.limit !== undefined && req.params.severity !== undefined) {
+                Con.fromLog(Number(req.params.limit), null, req.params.severity).then((resp) => {
+                    res.json(resp);
+                });;
+            }  else if (req.params.category !== undefined && req.params.severity !== undefined) {
+                Con.fromLog(100, req.params.category, req.params.severity).then((resp) => {
+                    res.json(resp);
+                });;
+            }  else if (req.params.limit !== undefined) {
+                Con.fromLog(Number(req.params.limit)).then((resp) => {
+                    res.json(resp);
+                });;
+            }  else if (req.params.category !== undefined) {
+                Con.fromLog(100, req.params.category).then((resp) => {
+                    res.json(resp);
+                });;
+            }  else if (req.params.severity !== undefined) {
+                Con.fromLog(100, null, req.params.severity).then((resp) => {
+                    res.json(resp);
+                });;
+            } else {
+                Con.fromLog().then((resp) => {
+                    res.json(resp);
+                });
             }
-        });
+            break;
+        default:
+            res.status(400).send('Malformed request');
+    }
+});
+
+app.get('/api/guild/:action', function (req, res) {
+    Con.toLog(`API Call: /api/guild/${req.params.action}`, 'express_api');
+    switch (req.params.action.toLocaleLowerCase()) {
+        case "members":
+            let guildMemberCount = bot.guilds.find(guild => guild.id, settings['bot_guild_id']).memberCount;
+            res.json({members: guildMemberCount});
+            break;
+        default:
+            res.status(400).send('Malformed request');
+    }
+});
+
+app.post('/api/user/:action', function (req, res) {
+    Con.toLog(`API Call: /api/user/${req.params.action}`, 'express_api');
+    let secret, reason;
+    let hasmanage = Api.djs.permissions.check(bot, settings['bot_guild_id'], 'MANAGE_ROLES')
+    let haskick = Api.djs.permissions.check(bot, settings['bot_guild_id'], 'MANAGE_ROLES')
+    let hasban = Api.djs.permissions.check(bot, settings['bot_guild_id'], 'MANAGE_ROLES')
+    if (req.body.secret === undefined) {
+        secret = null;
+        // Api.respond.send(res, 498, 'Invalid secret');
     } else {
-        fs.writeFile('./json/store/messages.json', JSON.stringify(messages, null, 4), (err) => { 
-            if (err) {
-                console.log(err);
-            } 
-        });
+        secret = req.body.secret;
+    }
+    if (req.body.reason === undefined) {
+        reason = null;
+        // Api.respond.send(res, 498, 'Invalid secret');
+    } else {
+        reason = req.body.reason;
     }
 
-    delete require.cache[require.resolve(`./json/store/messages.json`)];
-}
+    switch (req.params.action.toLocaleLowerCase()) {
+        case "find":
+        case "0":
+            if (req.body.user_name !== undefined) {
+                Usr.find(bot, req.body.user_name).then((result) => {
+                    if (result !== false) {
+                        res.json(result);
+                    } else {
+                        Api.respond.send(res, 404, 'User not found');
+                    }
+                });
+            }
+            break;
+        case "show":
+        case "1":
+            if (req.body.user_id !== undefined) {
+                Usr.show(bot, req.body.user_id).then((result) => {
+                    if (result) {
+                        res.json(result);
+                    } else {
+                        Api.respond.send(res, 404, 'User not found');
+                    }
+                });
+            }
+            break
+        case "verify":
+        case "2":
+            if (req.body.user_id !== undefined && secret !== null && hasmanage) {
+                Usr.verify(bot, req.body.user_id);
+                Api.respond.send(res, 200, 'Verify request sent');
+            }
+            break;
+        case "invalidate":
+        case "3":
+            if (req.body.user_id !== undefined && secret !== null && hasmanage) {
+                Usr.invalidate(bot, req.body.user_id);
+                Api.respond.send(res, 200, 'Invalidate request sent');
+            }
+            break;
+        case "kick":
+        case "4":
+            if (req.body.user_id !== undefined && secret !== null && haskick) {
+                Usr.kick(bot, req.body.user_id, reason);
+                Api.respond.send(res, 200, 'Kick request sent');
+            }
+            break;
+        case "ban":
+        case "5":
+            if (req.body.user_id !== undefined && secret !== null && hasban) {
+                Usr.ban(bot, req.body.user_id, reason);
+                Api.respond.send(res, 200, 'Ban request sent');
+            }
+            break;
+        default:
+            res.status(400).send('Malformed request');
+    }
+});
+
+app.get('/api/messages/:action', function (req, res) {
+    Con.toLog(`API Call: /api/messages/${req.params.action}`, 'express_api');
+    let limit, type;
+    if (req.query.limit !== undefined) {
+        limit = req.query.limit;
+    } else {
+        limit = 100;
+    }
+
+    if (req.query.type !== undefined) {
+        if (req.query.type == 'xml') {
+            type = 'xml';
+        } else {
+            type = 'json';
+        }
+    } else {
+        type = 'json';
+    }
+
+    switch (req.params.action.toLocaleLowerCase()) {
+        case "show":
+        case "0":
+            Msg.store.retrieve(limit).then((result) => {
+                Api.respond.objectFormat(res, result, type);
+            });
+            break;
+        case "channel":
+        case "1":
+            Msg.store.retrieve(limit, req.query.channel_id, null).then((result) => {
+                Api.respond.objectFormat(res, result, type);
+            });
+            break;
+        case "user":
+        case "2":
+            Msg.store.retrieve(limit, null, user=req.query.user_id).then((result) => {
+                Api.respond.objectFormat(res, result, type);
+            });
+            break;
+        case "full":
+        case "3":
+            Msg.store.retrieve(limit, req.query.channel_id, req.query.user_id).then((result) => {
+                Api.respond.objectFormat(res, result, type);
+            });
+            break;
+        case "flush":
+        case "4":
+            Api.secret.verify(req.query.secret).then((result) => {
+                if (result) {
+                    Api.respond.send(res, 200, `Verified: ${Msg.store.flush()}`);
+                } else {
+                    Api.respond.send(res, 401, 'Secret could not be validated');
+                }
+            });
+            break;
+        default:
+            Api.respond.send(res, 400, 'Malformed Request');
+    }
+});
+
+app.post('/api/secret/:action', function (req, res) {
+    Con.toLog(`API Call: /api/secret/${req.params.action}`, 'express_api');
+    let secret, token;
+    if (req.body.secret !== undefined) {
+        secret = req.body.secret;
+    }
+    if (req.body.token !== undefined) {
+        token = req.body.token;
+    }
+
+    switch (req.params.action.toLocaleLowerCase()) {
+        case "verify":
+        case "0":
+            if (secret === undefined || secret === null) {
+                res.status(400).send('secret not defined or empty');
+            } else {
+                Api.secret.verify(secret).then((response) => {
+                    if (response) {
+                        res.json({'result': 200});
+                    } else {
+                        res.json({'result': 401});
+                    }
+                });
+            }
+            break;
+        case "create":
+        case "1":
+            if (token !== undefined || token !== null) {
+                desc = '';
+                if (req.body.description !== undefined || req.body.description !== null) {
+                    desc = req.body.description;
+                }
+                new_secret = Api.secret.create(token, desc, settings);
+                if (new_secret === false) {
+                    Api.respond.send(res, 500);
+                } else {
+                    res.json(new_secret);
+                }
+            } else {
+                Api.respond.send(res, 400, 'Token not defined or empty');
+            }
+            break;
+        case "remove":
+        case "2":
+            Api.secret.remove(res, secret, req.body.confirm);
+            break;
+        default:
+            Api.respond.send(res, 400, 'Malformed request');
+    }
+});

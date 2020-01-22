@@ -1,32 +1,23 @@
 {
-  "name": "ase-verifier",
-  "version": "0.0.1",
-  "description": "Discord bot written in d.js",
-  "main": "app.js",
-  "scripts": {
-    "start": "node app.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/obliv1on/ase-verifier.git"
-  },
-  "keywords": [
-    "verification bot",
-    "discord",
-    "discord.js",
-    "javascript"
-  ],
-  "author": "obliv1on",
-  "license": "GPL-3.0",
-  "bugs": {
-    "url": "https://github.com/obliv1on/ase-verifier/issues"
-  },
-  "homepage": "https://github.com/obliv1on/ase-verifier#readme",
+  "name": "ase-verifier-rewrite",
+  "version": "0.0.2",
+  "description": "",
+  "main": "start.js",
   "dependencies": {
-    "discord.js": "^11.0.0",
-    "express": "^4.16.4",
+    "body-parser": "^1.19.0",
+    "discord.js": "^11.5.1",
+    "express": "^4.17.1",
     "hat": "0.0.3",
-    "xml": "^1.0.1",
-    "xml2js": "^0.4.19"
-  }
+    "inquirer": "^7.0.0",
+    "progress": "^2.0.3",
+    "sqlite3": "^4.1.1",
+    "xml2js": "^0.4.23"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prep": "node tools.js"
+  },
+  "author": "",
+  "license": "ISC"
 }
