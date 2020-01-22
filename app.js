@@ -166,9 +166,9 @@ app.get('/api/guild/:action', function (req, res) {
 app.post('/api/user/:action', function (req, res) {
     Con.toLog(`API Call: /api/user/${req.params.action}`, 'express_api');
     let secret, reason;
-    let hasmanage = Api.djs.permissions.check(bot, settings['bot_guild_id'], 'MANAGE_ROLES')
-    let haskick = Api.djs.permissions.check(bot, settings['bot_guild_id'], 'MANAGE_ROLES')
-    let hasban = Api.djs.permissions.check(bot, settings['bot_guild_id'], 'MANAGE_ROLES')
+    let hasmanage = Api.djs.permissions.check(bot, settings['bot_guild_id'], 'MANAGE_ROLES');
+    let haskick = Api.djs.permissions.check(bot, settings['bot_guild_id'], 'KICK_MEMBERS');
+    let hasban = Api.djs.permissions.check(bot, settings['bot_guild_id'], 'BAN_MEMBERS');
     if (req.body.secret === undefined) {
         secret = null;
         // Api.respond.send(res, 498, 'Invalid secret');
