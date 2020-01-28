@@ -60,12 +60,18 @@ bot.on("ready", () => {
 });
 
 bot.on("message", message => {
+    if (message.author.bot) {
+        return;
+    }
     if (message.guild.id == settings['bot_guild_id']) {
         Msg.store.add(Msg.toObject(message, settings), settings);
     }
 });
 
 bot.on("messageDelete", (deletedMessage) => {
+    if (deletedMessage.author.bot) {
+        return;
+    }
     if (deletedMessage.guild.id == settings['bot_guild_id']) {
         Con.toLog('DeleteMessage Invoked. Synchronizing message_store', 'discord_api');
         Msg.store.remove(deletedMessage.id);
@@ -73,6 +79,9 @@ bot.on("messageDelete", (deletedMessage) => {
 });
 
 bot.on("messageUpdate", (oldMessage, newMessage) => {
+    if (oldMessage.author.bot) {
+        return;
+    }
     if (oldMessage.guild.id == settings['bot_guild_id']) {
         Con.toLog('UpdateMessage Invoked. Synchronizing message_store', 'discord_api');
         Msg.store.alter(oldMessage, newMessage, settings);
@@ -109,7 +118,6 @@ app.get('/api/status', function(req, res) {
 
 app.get('/api/logs/:action', function (req, res) {
     Con.toLog(`API Call: /api/logs/${req.params.action}`, 'express_api');
-    let ret;
     switch(req.params.action.toLocaleLowerCase()) {
         case "show":
             if (req.params.limit !== undefined && req.params.category !== undefined && req.params.severity !== undefined) {
@@ -297,6 +305,76 @@ app.get('/api/messages/:action', function (req, res) {
         default:
             Api.respond.send(res, 400, 'Malformed Request');
     }
+});
+
+app.post('/api/send/:action', function (req, res) {
+    Con.toLog(`API Call: /api/send/${req.params.action}`, 'express_api');
+    if (req.body.secret === undefined) {
+        secret = null;
+        // Api.respond.send(res, 498, 'Invalid secret');
+    } else {
+        secret = req.body.secret;
+    }
+
+    if (req.body.channel_id === undefined || req.body.channel_id === null) {
+        Api.respond.send(res, 400, 'Channel ID not defined empty');
+    }
+    Api.secret.verify(secret).then((result) => {
+        if (result) {
+            switch (req.params.action.toLocaleLowerCase()) {
+                case "message":
+                case "0":
+                    if (req.body.message !== undefined || req.body.message !== null || req.body.message !== "") {
+                        Con.toLog(`Incoming sendMessage request, secret: ${secret}`, 'express_api');
+                        if (Msg.discord.sendMessage(bot, req.body.message, req.body.channel_id)) {
+                            Api.respond.send(res, 200, 'Message sent');
+                        } else {
+                            Api.respond.send(res, 400, 'Message not sent. Malformed request or API error.');
+                        }
+                    } else {
+                        Api.respond.send(res, 400, 'Message not defined or empty');
+                    }
+                    break;
+                case "embed":
+                case "1":
+                    if (req.body.message !== undefined || req.body.message !== null || req.body.message !== "") {
+                        Con.toLog(`Incoming sendEmbedMessage request, secret: ${secret}`, 'express_api');
+                        if (Msg.discord.sendEmbedMessage(bot, req.body.message, req.body.channel_id)) {
+                            Api.respond.send(res, 200, 'Embed sent');
+                        } else {
+                            Api.respond.send(res, 400, 'Embed not sent. Malformed request or API error.');
+                        }
+                    } else {
+                        Api.respond.send(res, 400, 'Embed message not defined or empty');
+                    }
+                break;
+                case "announcement":
+                case "2":
+                    Con.toLog(`Incoming sendGameAnnouncement request, secret: ${secret}`, 'express_api');
+                    let ann = {
+                        author: {
+                            name: req.body.author_name,
+                            icon: req.body.author_avatar
+                        },
+                        title: req.body.event_name,
+                        url: req.body.event_url,
+                        game: {
+                            time: req.body.event_date,
+                            terrain: req.body.event_terrain,
+                            description: req.body.event_description
+                        }
+                    }
+                    if (Msg.discord.sendGameAnnouncement(bot, ann, req.body.channel_id)) {
+                        Api.respond.send(res, 200, 'Embed sent');
+                    } else {
+                        Api.respond.send(res, 400, 'Embed not sent. Malformed request or API error.');
+                    }
+                    break;
+                default:
+                    Api.respond.send(res, 400, 'Malformed Request');
+            }
+        }
+    });
 });
 
 app.post('/api/secret/:action', function (req, res) {
