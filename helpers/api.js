@@ -9,8 +9,13 @@ class main {
 }
 
 class djs {
-    constructor() {
+    constructor () {
         this.permissions = new permissions();
+    }
+
+    get sql() {
+        let dbjs = require('./db.js');
+        return new dbjs();
     }
 }
 
@@ -75,8 +80,9 @@ class secret {
         let sql = this.sql;
         let db = sql.connect();
         let newrows = [];
-        if (scrt != null || scrt != undefined) {
-            return new Promise(function (resolve, reject) {
+
+        return new Promise(function (resolve, reject) {
+            if (scrt != null || scrt != undefined) {
                 let query = 'SELECT key FROM app_keys;';
 
                 sql.toLog(`Beginning secret verification`, 'express_api');
@@ -100,8 +106,10 @@ class secret {
                         resolve(false);
                     });
                 });
-            });
-        }
+            } else {
+                resolve(false);
+            }
+        });
     }
 
     create(token, description, settings) {
