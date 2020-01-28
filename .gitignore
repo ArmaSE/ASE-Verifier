@@ -3,4 +3,5 @@ node_modules/
 main.db
 main.shipping.db
 main.dev.db
+main.prod.db
 ignore.sql
