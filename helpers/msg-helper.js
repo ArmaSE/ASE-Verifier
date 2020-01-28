@@ -28,13 +28,15 @@ class msgHelper {
                 string: message.content
             }
         
-            if (message.attachments != undefined) {
+            if (message.attachments !== undefined && message.attachments !== "") {
                 contentObject.attachments = [];
                 message.attachments.forEach((attachment) => {
                     contentObject.attachments.push(attachment.proxyURL);
                 });
+            } else if (message.embeds.length > 0) {
+                contentObject.attachments = ['embed'];
             } else {
-                contentObject.attachments = ['']
+                contentObject.attachments = [''];
             }
     
             let convertedMessage = {};
@@ -50,6 +52,203 @@ class msgHelper {
 
 class discord {
     constructor() {}
+
+    sendMessage(bot, message, channel_id) {
+        let sql = this.sql;
+
+        try {
+            bot.channels.get(channel_id).send(message);
+            sql.toLog(`sendMessage complete. Message: ${message}`, 'discord_api_messages');
+            return true;
+        } catch (e) {
+            sql.toLog(e, 'error', 2);
+            sql.toLog('sendMessage request could not be completed', 'discord_api_messagea', 1);
+            return false;
+        }
+    }
+
+    sendError(bot, err_message, channel_id) {
+        let sql = this.sql;
+        let color = 13832208;
+
+        let embed_ct = {
+            color: color,
+            title: "The bot has encountered an error",
+            description: err_message,
+            timestamp: new Date(),
+            footer: {
+                icon_url: bot.user.avatarURL,
+                text: "För mer info, besök asev.obliv1on.com"
+            }
+        }
+
+        try {
+            bot.channels.get(channel_id).send({embed: embed_ct});
+            sql.toLog(`sendError complete. Message: ${err_message}`, 'discord_api_messages');
+            return true;
+        } catch (e) {
+            sql.toLog(e, 'error', 2);
+            sql.toLog('sendError request could not be completed', 'discord_api_messagea', 1);
+            return false;
+        }
+    }
+
+    sendAlert(bot, message, extra_text, channel_id) {
+        let sql = this.sql;
+        let color = 15888410;
+
+        let embed_ct = {
+            color: color,
+            title: message,
+            description: extra_text,
+            timestamp: new Date(),
+            footer: {
+                icon_url: bot.user.avatarURL,
+                text: "För mer info, besök asev.obliv1on.com"
+            }
+        }
+
+        try {
+            bot.channels.get(channel_id).send({embed: embed_ct});
+            sql.toLog(`sendAlert complete. Message: ${message}`, 'discord_api_messages');
+            return true;
+        } catch (e) {
+            sql.toLog(e, 'error', 2);
+            sql.toLog('sendAlert request could not be completed', 'discord_api_messagea', 1);
+            return false;
+        }
+    }
+
+    sendEmbedMessage(bot, message, channel_id) {
+        let sql = this.sql;
+        let color = 27812;
+
+        let embed_ct = {
+            color: color,
+            description: message,
+            timestamp: new Date()
+        }
+
+        try {
+            bot.channels.get(channel_id).send({embed: embed_ct});
+            sql.toLog(`sendEmbedMessage complete. Message: ${message}`, 'discord_api_messages');
+            return true;
+        } catch (e) {
+            sql.toLog(e, 'error', 2);
+            sql.toLog('sendEmbedMessage request could not be completed', 'discord_api_messagea', 1);
+            return false;
+        }
+    }
+
+    sendGameAnnouncement(bot, message, channel_id) {
+        let sql = this.sql;
+        let color = 12841498;
+
+        let embed_ct = {
+            color: color,
+            author: {
+                name: message.author.name,
+                icon_url: message.author.icon
+            },
+            title: message.title,
+            url: message.url,
+            description: "Nytt spel har reserverats!",
+            fields: [
+                {
+                    name: "Datum",
+                    value: message.game.time
+                },
+                {
+                    name: "Terräng",
+                    value: message.game.terrain
+                },
+                {
+                    name: "Kort beskrvning",
+                    value: message.game.description
+                }
+            ],
+            timestamp: new Date(),
+            footer: {
+                icon_url: bot.user.avatarURL,
+                text: "För mer info, gå in på armasweden.se"
+            }
+        }
+
+        try {
+            bot.channels.get(channel_id).send({embed: embed_ct});
+            sql.toLog(`sendGameAnnouncement complete. Message: ${message}`, 'discord_api_messages');
+            return true;
+        } catch (e) {
+            sql.toLog(e, 'error', 2);
+            sql.toLog('sendGameAnnouncement request could not be completed', 'discord_api_messagea', 1);
+            return false;
+        }
+    }
+
+    sendResponse(bot, message, channel_id) {
+        let sql = this.sql;
+        let color = 4095;
+
+        let embed_ct = {
+            color: color,
+            description: message,
+            timestamp: new Date()
+        }
+
+        try {
+            bot.channels.get(channel_id).send({embed: embed_ct});
+            sql.toLog(`sendResponse complete. Message: ${message}`, 'discord_api_messages');
+            return true;
+        } catch (e) {
+            sql.toLog(e, 'error', 2);
+            sql.toLog('sendResponse request could not be completed', 'discord_api_messagea', 1);
+            return false;
+        }
+    }
+
+    // sendCustomEmbed(bot, message, hex, channel_id) {
+    //     let sql = this.sql;
+
+    //     let embed = {
+    //         color: hex,
+    //         author: {
+    //             name: bot.user.username,
+    //             icon_url: bot.user.avatarURL
+    //         },
+    //         title: "This is an embed",
+    //         url: "http://google.com",
+    //         description: "This is a test embed to showcase what they look like and what they can do.",
+    //         fields: [
+    //             {
+    //                 name: "Fields",
+    //                 value: "They can have different fields with small headlines."
+    //             },
+    //             {
+    //                 name: "Masked links",
+    //                 value: "You can put [masked links](http://google.com) inside of rich embeds."
+    //             },
+    //             {
+    //                 name: "Markdown",
+    //                 value: "You can put all the *usual* **__Markdown__** inside of them."
+    //             }
+    //         ],
+    //         timestamp: new Date(),
+    //         footer: {
+    //         icon_url: bot.user.avatarURL,
+    //         text: "© Example"
+    //         }
+    //     }
+
+    //     try {
+    //         bot.channels.get(channel_id).send(message);
+    //         sql.toLog(`sendEmbed complete. Message: ${message}`, 'discord_api_messages');
+    //         return true;
+    //     } catch (e) {
+    //         sql.toLog(e, 'error', 2);
+    //         sql.toLog('sendEmbed request could not be completed', 'discord_api_messagea', 1);
+    //         return false;
+    //     }
+    // }
 
     get sql() {
         let dbjs = require('./db.js');
