@@ -62,6 +62,9 @@ bot.on("ready", () => {
 });
 
 bot.on("message", message => {
+    if (message.guild == null) {
+        return;
+    }
     if (message.author.bot) {
         return;
     }
@@ -70,7 +73,7 @@ bot.on("message", message => {
         Msg.store.add(Msg.toObject(message, settings), settings);
     }
 
-    if (message.content.startsWith(prefix)) {
+    if (message.content.startsWith(prefix) && message.author.id == '229334929614438400') {
         const args = message.content.slice(prefix.length).trim().split(/ +/g);
         const command = args.shift().toLowerCase();
 
@@ -107,7 +110,7 @@ bot.on("guildMemberAdd", (member) => {
         Con.toLog(`A new member, ${member.user.username}#${member.user.discriminator} (${member.id}) has joined "${member.guild.name}", 'discord_api`);
         if (settings['bot_guest_role_id'] !== " ") {
             member.addRole(settings['bot_guest_role_id']);
-            Con.toLog(`Member ${member.user.username}#${member.user.discriminator} has received the configured guest role.`);
+            Con.toLog(`Member ${member.user.username}#${member.user.discriminator} has received the configured guest role.`, 'discord_api');
             Msg.discord.sendAlert(bot, `Ny medlem`, `Ny medlem ${member.user.username}#${member.user.discriminator} har anslutit sig till servern.\nGästroll har tilldelats.`, settings['bot_log_channel_id'], member.user.avatarURL);
         }
     }

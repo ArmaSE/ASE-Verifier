@@ -132,7 +132,7 @@ class discord {
             return true;
         } catch (e) {
             sql.toLog(e, 'error', 2);
-            sql.toLog('sendAlert request could not be completed', 'discord_api_messagea', 1);
+            sql.toLog('sendAlert request could not be completed', 'discord_api_messages', 1);
             return false;
         }
     }

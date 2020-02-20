@@ -15,7 +15,7 @@ class Djs {
                                 if (!role) return msg.channel.send(`**${msg.author.username}**, roll kunde ej hittas.`);
     
                                 msg.guild.members.filter(m => !m.user.bot).forEach(member => member.addRole(role))
-                                msg.channel.send(`**${msg.author.username}**, role **${role.name}** har tilldelats till samtiliga medlemmar.`)
+                                msg.react('✅');
                                 break;
                             default:
                                 return;
