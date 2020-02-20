@@ -31,6 +31,7 @@ function prepare_db() {
         `INSERT INTO settings VALUES ('bot_activity_url', ' ', 1);`,
         `INSERT INTO settings VALUES ('bot_guild_id', ' ', 1);`,
         `INSERT INTO settings VALUES ('bot_verify_role_id', ' ', 1);`,
+        `INSERT INTO settings VALUES ('bot_log_channel_id', ' ', 1);`,
         `INSERT INTO settings VALUES ('app_port', '${defaults.app_port}', 1);`,
         `INSERT INTO settings VALUES ('app_read_express_modules', '${defaults.app_read_express_modules}', 1);`,
         `INSERT INTO settings VALUES ('app_store_messages', '${defaults.app_store_messages}', 1);`,

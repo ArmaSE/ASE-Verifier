@@ -93,18 +93,36 @@ class discord {
         }
     }
 
-    sendAlert(bot, message, extra_text, channel_id) {
+    sendAlert(bot, message, extra_text, channel_id, image=null) {
         let sql = this.sql;
         let color = 15888410;
 
-        let embed_ct = {
-            color: color,
-            title: message,
-            description: extra_text,
-            timestamp: new Date(),
-            footer: {
-                icon_url: bot.user.avatarURL,
-                text: "För mer info, besök asev.obliv1on.com"
+        let embed_ct = null
+
+        if (image == null) {
+            embed_ct = {
+                color: color,
+                title: message,
+                description: extra_text,
+                timestamp: new Date(),
+                footer: {
+                    icon_url: bot.user.avatarURL,
+                    text: "För mer info, besök asev.obliv1on.com"
+                }
+            }
+        } else {
+            embed_ct = {
+                color: color,
+                title: message,
+                description: extra_text,
+                timestamp: new Date(),
+                footer: {
+                    icon_url: bot.user.avatarURL,
+                    text: "För mer info, besök asev.obliv1on.com"
+                },
+                thumbnail: {
+                    url: image
+                }
             }
         }
 
