@@ -139,6 +139,7 @@ class user {
                             sql.toLog(`User successfully verified`, 'api_user');
                             try {
                                 msghelper.discord.sendAlert(bot, ':white_check_mark: New validation', `**User:** ${result.displayName} (${userid})\n\nAccount is now verified.`, logChannel, result.user.avatarURL);
+                                result.send(`**Hej!**\n\nOm du får detta meddelande så har du nyligen valt att verifiera ditt konto på <https://armasweden.se>.\nDetta innebär att du har blivit tilldelad en roll i servern "${guild.name}". Om du inte har verifierat ditt konto på våran hemsida och du fick detta meddelande, var god kontakta ledningen.`);
                             } catch (e) {
                                 console.log(e)
                             }
@@ -198,6 +199,7 @@ class user {
                             sql.toLog(`User successfully invalidated`, 'api_user');
                             try {
                                 msghelper.discord.sendAlert(bot, ':negative_squared_cross_mark: New Invalidation', `**User:** ${result.displayName} (${userid})\n\nAccount is no longer verified.`, logChannel, result.user.avatarURL);
+                                result.send(`**Hej!**\n\nDetta meddelande skickas till dig för att informera dig om att ditt Discord-konto inte längre är verifierat i servern "${guild.name}".`);
                             } catch (e) {
                                 console.log(e)
                             }
