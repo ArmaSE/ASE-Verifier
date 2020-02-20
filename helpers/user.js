@@ -114,6 +114,7 @@ class user {
         let guild = null;
         let msghelper = this.msghelper;
         let logChannel = this.settings['bot_log_channel_id'];
+        let guestRole = this.settings['bot_guest_role_id'];
         sql.toLog(`User verify request, ID: ${userid}`, 'api_user');
         try {
             sql.toLog(`Trying to access properties of guild ${guildid}`, 'api_user');
@@ -137,6 +138,7 @@ class user {
                         sql.toLog(`Accessed properties of user "${result.displayName}"`, 'api_user');
                         result.addRole(roleid).then(function () {
                             sql.toLog(`User successfully verified`, 'api_user');
+                            result.removeRole(guestRole);
                             try {
                                 msghelper.discord.sendAlert(bot, ':white_check_mark: New validation', `**User:** ${result.displayName} (${userid})\n\nAccount is now verified.`, logChannel, result.user.avatarURL);
                                 result.send(`**Hej!**\n\nOm du får detta meddelande så har du nyligen valt att verifiera ditt konto på <https://armasweden.se>.\nDetta innebär att du har blivit tilldelad en roll i servern "${guild.name}". Om du inte har verifierat ditt konto på våran hemsida och du fick detta meddelande, var god kontakta ledningen.`);
@@ -174,6 +176,7 @@ class user {
         let guild = null;
         let msghelper = this.msghelper;
         let logChannel = this.settings['bot_log_channel_id'];
+        let guestRole = this.settings['bot_guest_role_id'];
         sql.toLog(`User invalidate request, ID: ${userid}`, 'api_user');
         try {
             sql.toLog(`Trying to access properties of guild ${guildid}`, 'api_user');
@@ -196,6 +199,7 @@ class user {
                         }
                         sql.toLog(`Accessed properties of user "${result.displayName}"`, 'api_user');
                         result.removeRole(roleid).then(function () {
+                            result.addRole(guestRole);
                             sql.toLog(`User successfully invalidated`, 'api_user');
                             try {
                                 msghelper.discord.sendAlert(bot, ':negative_squared_cross_mark: New Invalidation', `**User:** ${result.displayName} (${userid})\n\nAccount is no longer verified.`, logChannel, result.user.avatarURL);

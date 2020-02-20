@@ -7,6 +7,7 @@ const msg_req = require('./helpers/msg-helper.js');
 const api_req = require('./helpers/api.js');
 const con_req = require('./helpers/db.js');
 const usr_req = require('./helpers/user.js');
+const dis_msg = require('./cogs/message.js');
 let bodyParser = require('body-parser');
 
 // Initial vars and constants
@@ -17,6 +18,7 @@ let Msg = new msg_req();
 let Api = new api_req();
 let Usr = new usr_req();
 let Con = new con_req();
+let Djs = new dis_msg();
 
 Con.toLog(`App started`);
 
@@ -63,8 +65,16 @@ bot.on("message", message => {
     if (message.author.bot) {
         return;
     }
-    if (message.guild.id == settings['bot_guild_id']) {
+    let prefix = settings['bot_prefix'];
+    if (!message.content.startsWith(prefix) && message.guild.id == settings['bot_guild_id']) {
         Msg.store.add(Msg.toObject(message, settings), settings);
+    }
+
+    if (message.content.startsWith(prefix)) {
+        const args = message.content.slice(prefix.length).trim().split(/ +/g);
+        const command = args.shift().toLowerCase();
+
+        Djs.message(bot, command, args, message, settings);
     }
 });
 
@@ -90,6 +100,24 @@ bot.on("messageUpdate", (oldMessage, newMessage) => {
 
 bot.on("guildCreate", (guild) => {
     Con.toLog(`Bot has joined new guild. Guild name: ${guild.name}`, 'discord_api', 1);
+});
+
+bot.on("guildMemberAdd", (member) => {
+    if (member.guild.id == settings['bot_guild_id']) {
+        Con.toLog(`A new member, ${member.user.username}#${member.user.discriminator} (${member.id}) has joined "${member.guild.name}", 'discord_api`);
+        if (settings['bot_guest_role_id'] !== " ") {
+            member.addRole(settings['bot_guest_role_id']);
+            Con.toLog(`Member ${member.user.username}#${member.user.discriminator} has received the configured guest role.`);
+            Msg.discord.sendAlert(bot, `Ny medlem`, `Ny medlem ${member.user.username}#${member.user.discriminator} har anslutit sig till servern.\nGästroll har tilldelats.`, settings['bot_log_channel_id'], member.user.avatarURL);
+        }
+    }
+});
+
+bot.on("guildMemberRemove", (member) => {
+    if (member.guild.id == settings['bot_guild_id']) {
+        Con.toLog(`Member ${member.user.username}#${member.user.discriminator} (${member.id}) has left "${member.guild.name}"`, 'discord_api')
+        Msg.discord.sendAlert(bot, `Medlem har lämnat`, `Medlem ${member.user.username}#${member.user.discriminator} har lämnat servern.`, settings['bot_log_channel_id'], member.user.avatarURL);
+    }
 });
 
 bot.on("error", (err) => {
