@@ -80,6 +80,11 @@ class user {
                             sql.toLog('User search returned null', 'api_user', 1);
                             resolve(false);
                         }
+                        let roleList = match.roles.array();
+                        let newRoleList = new Array();
+                        roleList.forEach(element => {
+                            newRoleList.push({id: element.id, role: element.name});
+                        });
                         let response = {
                             displayname: match.displayName,
                             fullname: `${match.user.username}#${match.user.discriminator}`,
@@ -87,16 +92,18 @@ class user {
                             avatar: match.user.avatarURL,
                             presence: match.presence,
                             jointime: match.joinedTimestamp,
-                            roles: match.roles
+                            roles: newRoleList
                         }
                         sql.toLog(`Accessed properties of user ${match.displayName}`, 'api_user');
                         resolve(response);
                     }).catch((err) => {
                         sql.toLog('User show returned no results', 'api_user', 1)
+                        console.log(err);
                         resolve(false);
                     });
             } catch (e) {
                 sql.toLog(`Could not access properties of user ${userid}`, 'api_user', 1);
+                console.log(e);
                 resolve(false);
             }
         });
