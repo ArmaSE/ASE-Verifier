@@ -249,8 +249,9 @@ app.post('/api/user/:action', function (req, res) {
         case "verify":
         case "2":
             if (req.body.user_id !== undefined && secret !== null && hasmanage) {
-                Usr.verify(bot, req.body.user_id);
-                Api.respond.send(res, 200, 'Verify request sent');
+                Usr.verify(bot, req.body.user_id).then((result) => {
+                    Api.respond.send(res, 200, result);
+                });
             }
             break;
         case "invalidate":

@@ -140,33 +140,44 @@ class user {
                         let result = server.members.find(m => m.id === userid);
                         if (result === false) {
                             sql.toLog('User search returned null', 'api_user', 1);
-                            resolve(false);
+                            resolve(`1 - User not found`);
+                            return;
                         }
                         sql.toLog(`Accessed properties of user "${result.displayName}"`, 'api_user');
-                        result.addRole(roleid).then(function () {
-                            sql.toLog(`User successfully verified`, 'api_user');
-                            result.removeRole(guestRole);
-                            try {
-                                msghelper.discord.sendAlert(bot, ':white_check_mark: Ny verifiering', `**Användare:** ${result.displayName} (${userid})\n\nKontot är nu verifierat.`, logChannel, result.user.avatarURL);
-                                result.send(`Tack för att du validerade ditt Discord-konto. Välkommen till Arma Sweden!`);
-                            } catch (e) {
-                                console.log(e)
-                            }
-                            resolve(true);
-                        }).catch((e) => {
-                            sql.toLog('User verification could not be completed. User may be higher in hierarchy', 'api_user');
-                            sql.toLog(e, 'error', 2);
-                            resolve(result);
-                        });
-                        resolve(true);
+                        if (result.roles.find(role => role.id === roleid)) {
+                            resolve(`2 - User already has role`);
+                            return;
+                        } else {
+                            result.addRole(roleid).then(function () {
+                                sql.toLog(`User successfully verified`, 'api_user');
+                                result.removeRole(guestRole);
+                                try {
+                                    msghelper.discord.sendAlert(bot, ':white_check_mark: Ny verifiering', `**Användare:** ${result.displayName} (${userid})\n\nKontot är nu verifierat.`, logChannel, result.user.avatarURL);
+                                    result.send(`Tack för att du validerade ditt Discord-konto. Välkommen till Arma Sweden!`);
+                                } catch (e) {
+                                    console.log(e)
+                                }
+                                resolve(`0 - User verified`);
+                                return;
+                            }).catch((e) => {
+                                sql.toLog('User verification could not be completed. User may be higher in hierarchy', 'api_user');
+                                sql.toLog(e, 'error', 2);
+                                resolve(`3 - User could not be validated`);
+                                return;
+                            });
+                        }
+                        resolve(`0 - User verified`);
+                        return;
                     }).catch((err) => {
                         sql.toLog('User search returned no results', 'api_user', 1);
                         sql.toLog(err, 'error', 2);
-                        resolve(false);
+                        resolve(`3 - User not found`);
+                        return;
                     });
             } catch (e) {
                 sql.toLog(`Could not access properties of user ${userid}`, 'api_user', 1);
-                resolve(false);
+                resolve(`4 - Could not access properties of user`);
+                return;
             }
         });
     }
