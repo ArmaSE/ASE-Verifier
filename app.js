@@ -197,6 +197,13 @@ app.get('/api/guild/:action', function (req, res) {
             let guildMemberCount = bot.guilds.find(guild => guild.id, settings['bot_guild_id']).memberCount;
             res.json({members: guildMemberCount});
             break;
+        case "permissions":
+            let hasmanage = Api.djs.permissions.check(bot, settings['bot_guild_id'], 'MANAGE_ROLES');
+            let haskick = Api.djs.permissions.check(bot, settings['bot_guild_id'], 'KICK_MEMBERS');
+            let hasban = Api.djs.permissions.check(bot, settings['bot_guild_id'], 'BAN_MEMBERS');
+
+            res.json({manage_roles: hasmanage, kick_perm: haskick, ban_perm: hasban});
+            break;
         default:
             res.status(400).send('Malformed request');
     }
